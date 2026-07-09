@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Build outputs
+dist/
+build/
+.next/
+coverage/
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*
+*token*
+vault-export*
+
+# Runtime data
+data/
+reports/
+*.sqlite
+
+# Backups
+backup-files/
+
+
+# Local generated scratch files
+file-qnw.py
+*.tsbuildinfo
+
+# Publish staging copies
+publish-staging/
