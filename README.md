@@ -1,6 +1,6 @@
-# Social Hunter
+﻿# Social Hunter
 
-Social Hunter is an educational OSINT aggregation platform scaffold for username, email, domain, and IP lookups. It is built around source attribution, confidence scoring, normalized evidence, exports, and operator auditability.
+Social Hunter is an educational OSINT aggregation platform scaffold for username, email, domain, IP, and phone lookups. It is built around source attribution, confidence scoring, normalized evidence, exports, and operator auditability.
 
 This build includes the platform around lawful OSINT workflows: UI, API, source registry, connector contracts, provider clients, report exports, data models, deployment files, monitoring profile, and classroom docs.
 
@@ -40,19 +40,31 @@ docker compose up --build
 
 ## Delivered Platform Pieces
 
-- Search dashboard with username, email, domain, and IP modes
+- Search dashboard with username, email, domain, IP, and phone modes
 - Reports view with JSON/CSV export flow
 - Source registry view
 - Admin/launch blocker view
 - FastAPI search, queued-job, source registry, source health, plans, launch checklist, export, and engine contract endpoints
 - WhatsMyName-style fixture connector
 - Public profile HTTP checker engine for approved public URLs
-- HIBP, IPinfo, and email-validation provider client skeletons
+- HIBP, IPinfo, Hunter.io, People Data Labs, Twilio Lookup, GitHub, X, search-index, business-data, and domain-intel provider client skeletons
 - PostgreSQL model scaffold and initial SQL migration for searches, findings, source health, exports, and audits
 - Rate-limit, auth-context, billing-plan, privacy-hash, and report service scaffolds
 - Docker Compose with Postgres, Redis, API, worker, web, Nginx, and Prometheus profiles
 - Classroom guide, cost model, legal templates, deployment and operations runbooks
 
+
+## Connector Families
+
+- `username_profile`: WhatsMyName-style public profiles, GitHub, Reddit, X, Mastodon/GitLab/Stack Overflow slots
+- `email_intel`: Hunter.io, HIBP, mailbox syntax/MX validation
+- `phone_intel`: Twilio Lookup v2 validation and carrier/risk intelligence
+- `person_enrichment`: People Data Labs and FullContact-style enrichment slots
+- `business_contact`: Google Places, Yelp Fusion, OpenCorporates
+- `domain_intel`: RDAP/WHOIS, IPinfo, SecurityTrails, BuiltWith/Wappalyzer, DNSDB-style passive DNS
+- `web_search`: Brave Search, SerpApi, Bing Web Search, Tavily, Exa, and legacy Google CSE customer slot
+
+Live provider calls are disabled until approved Vault-backed credentials and source terms are mapped. Placeholder connectors return normalized skipped findings for classroom workflows.
 ## Useful Commands
 
 ```powershell

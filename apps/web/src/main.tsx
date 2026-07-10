@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import ReactDOM from "react-dom/client";
 import {
   Activity,
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import "./styles.css";
 
-type TargetType = "username" | "email" | "domain" | "ip";
+type TargetType = "username" | "email" | "domain" | "ip" | "phone";
 type FindingStatus = "found" | "not_found" | "unknown" | "skipped" | "error";
 type View = "search" | "reports" | "sources" | "admin";
 
@@ -117,7 +117,7 @@ const fallbackSources: SourceCapability[] = [
     id: "external-engine-slot",
     name: "Separate Engine Slot",
     category: "external",
-    target_types: ["username", "email", "domain", "ip"],
+    target_types: ["username", "email", "domain", "ip", "phone"],
     status: "disabled",
     terms_note: "Only attach lawful, authorized, terms-compliant engines.",
     data_returned: ["normalized_findings"],
@@ -168,7 +168,7 @@ function App() {
           target_type: targetType,
           target,
           consent_confirmed: consent,
-          source_groups: ["username", "breach", "ip"],
+          source_groups: ["username_profile", "email_intel", "phone_intel", "person_enrichment", "business_contact", "domain_intel", "web_search", "breach", "ip"],
           dry_run: true,
         }),
       });
@@ -240,7 +240,7 @@ function App() {
             <section className="search-panel" id="search">
               <form onSubmit={runSearch}>
                 <div className="tabs" role="tablist" aria-label="Target type">
-                  {(["username", "email", "domain", "ip"] as TargetType[]).map((type) => (
+                  {(["username", "email", "domain", "ip", "phone"] as TargetType[]).map((type) => (
                     <button type="button" key={type} className={targetType === type ? "tab active" : "tab"} onClick={() => setTargetType(type)}>
                       {type}
                     </button>

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 from enum import Enum
 from typing import Literal
 from uuid import UUID, uuid4
@@ -11,6 +11,7 @@ class TargetType(str, Enum):
     email = "email"
     domain = "domain"
     ip = "ip"
+    phone = "phone"
 
 
 class FindingStatus(str, Enum):
@@ -33,7 +34,17 @@ class SearchRequest(BaseModel):
     target_type: TargetType
     target: str = Field(min_length=2, max_length=255)
     consent_confirmed: bool = False
-    source_groups: list[str] = Field(default_factory=lambda: ["username", "breach", "ip"])
+    source_groups: list[str] = Field(default_factory=lambda: [
+        "username_profile",
+        "email_intel",
+        "phone_intel",
+        "person_enrichment",
+        "business_contact",
+        "domain_intel",
+        "web_search",
+        "breach",
+        "ip",
+    ])
     dry_run: bool = True
 
 

@@ -1,4 +1,4 @@
-# Architecture
+﻿# Architecture
 
 ## Service Boundaries
 
@@ -11,6 +11,20 @@
 - `apps/api/social_hunter/db.py`: planned SQLAlchemy persistence models.
 - `apps/api/migrations/0001_initial.sql`: initial SQL schema scaffold.
 - `docs/engine-contract.md`: integration contract for separately built normalized-result engines.
+
+## Connector Families
+
+The connector registry is organized by capability instead of by one-off provider:
+
+- `username_profile`: public account/profile checks.
+- `email_intel`: email discovery, validation, and breach exposure checks.
+- `phone_intel`: validation and carrier/risk intelligence for known phone numbers.
+- `person_enrichment`: licensed person/company enrichment with consent or legitimate-interest gates.
+- `business_contact`: business/entity contact data from public or licensed providers.
+- `domain_intel`: RDAP/WHOIS, DNS, passive DNS, infrastructure, and technology profile sources.
+- `web_search`: search-index providers for public web evidence.
+
+Every provider adapter must return normalized `Finding` records and must not return raw secrets, cookies, or private payloads.
 
 ## Request Flow
 
@@ -28,4 +42,4 @@
 - Wire SQLAlchemy repositories into API and worker paths.
 - Replace demo auth with production identity.
 - Wire Stripe checkout/subscription webhooks.
-- Inject provider credentials through OpenClaw Vault-backed runtime config.
+- Inject provider credentials through OpenClaw Vault-backed runtime config.\n- Promote provider placeholders to live connectors only after terms, consent, rate-limit, and storage review.
