@@ -32,4 +32,3 @@ async def run_connectors(request: SearchRequest) -> list[Finding]:
         )
 
     return findings
-

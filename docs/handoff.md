@@ -1,4 +1,4 @@
-﻿# Handoff
+# Handoff
 
 ## Current State
 
@@ -75,5 +75,3 @@ Expected local URLs:
 - `http://localhost:8000/health`
 - `http://localhost:8000/api/sources`
 - `http://localhost:8000/api/engine-contract`
-
-

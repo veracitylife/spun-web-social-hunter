@@ -29,4 +29,3 @@ async def email_validation_placeholder(email: str) -> list[Finding]:
             ],
         )
     ]
-

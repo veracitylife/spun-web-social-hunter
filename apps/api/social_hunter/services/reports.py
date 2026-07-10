@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 
 from social_hunter.models import Finding, SearchResponse, TargetType
 

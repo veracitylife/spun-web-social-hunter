@@ -1,4 +1,4 @@
-﻿# Classroom Guide
+# Classroom Guide
 
 ## Learning Objectives
 

@@ -1,4 +1,4 @@
-﻿from social_hunter.models import EngineHandoffContract, SourceCapability, TargetType
+from social_hunter.models import EngineHandoffContract, SourceCapability, TargetType
 
 SOURCE_CAPABILITIES = [
     SourceCapability(

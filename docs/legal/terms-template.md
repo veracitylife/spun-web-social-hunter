@@ -1,4 +1,4 @@
-﻿# Terms Of Service Template
+# Terms Of Service Template
 
 This is a starter template, not legal advice.
 

@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
 import {
   Activity,
@@ -397,5 +397,3 @@ function AdminView(props: { contract: EngineContract | null; sources: SourceCapa
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
-
-

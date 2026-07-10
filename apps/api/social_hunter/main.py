@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 import io
 import json
 from uuid import UUID
@@ -100,6 +100,17 @@ async def source_health() -> list[SourceHealth]:
 
 @app.get("/api/plans", response_model=list[PlanResponse])
 async def plans() -> list[PlanResponse]:
+    if isinstance(PLANS, dict):
+        return [
+            PlanResponse(
+                id=plan_id,
+                name=str(plan["name"]),
+                monthly_search_limit=int(plan["monthly_searches"]),
+                export_enabled=bool(plan["exports"]),
+                api_access_enabled=bool(plan["api_access"]),
+            )
+            for plan_id, plan in PLANS.items()
+        ]
     return [PlanResponse(**plan.__dict__) for plan in PLANS]
 
 

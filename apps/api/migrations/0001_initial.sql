@@ -1,4 +1,4 @@
-﻿-- Social Hunter initial schema scaffold.
+-- Social Hunter initial schema scaffold.
 -- Apply with your migration tool of choice after replacing demo auth and persistence wiring.
 
 CREATE TABLE IF NOT EXISTS searches (

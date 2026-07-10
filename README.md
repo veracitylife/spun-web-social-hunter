@@ -1,4 +1,4 @@
-﻿# Social Hunter
+# Social Hunter
 
 Social Hunter is an educational OSINT aggregation platform scaffold for username, email, domain, and IP lookups. It is built around source attribution, confidence scoring, normalized evidence, exports, and operator auditability.
 
@@ -73,4 +73,3 @@ docker compose --profile monitoring up -d
 - `docs/runbooks/operations.md`
 - `docs/cost-model.md`
 - `docs/handoff.md`
-

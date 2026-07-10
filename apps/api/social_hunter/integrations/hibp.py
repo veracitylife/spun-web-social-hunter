@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 
 
 class ProviderNotConfigured(RuntimeError):

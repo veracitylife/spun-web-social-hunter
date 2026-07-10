@@ -1,4 +1,4 @@
-﻿# Privacy Policy Template
+# Privacy Policy Template
 
 This is a starter template, not legal advice.
 

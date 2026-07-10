@@ -54,4 +54,3 @@ Every connector must declare:
 ## Launch Gate
 
 Do not launch publicly until legal terms, privacy policy, abuse reporting, billing terms, and data retention controls are complete.
-

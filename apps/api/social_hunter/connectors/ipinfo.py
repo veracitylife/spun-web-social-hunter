@@ -29,4 +29,3 @@ async def ipinfo_placeholder(ip: str) -> list[Finding]:
             ],
         )
     ]
-

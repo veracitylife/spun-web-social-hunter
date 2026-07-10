@@ -20,4 +20,3 @@ async def breach_placeholder(email: str) -> list[Finding]:
             ],
         )
     ]
-

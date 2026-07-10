@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 
 from social_hunter.models import SourceHealth
 from social_hunter.sources import SOURCE_CAPABILITIES

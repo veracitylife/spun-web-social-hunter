@@ -13,4 +13,3 @@ COPY social_hunter ./social_hunter
 EXPOSE 8000
 
 CMD ["uvicorn", "social_hunter.main:app", "--host", "0.0.0.0", "--port", "8000"]
-

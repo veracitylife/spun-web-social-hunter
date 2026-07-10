@@ -1,4 +1,4 @@
-﻿# Production Deployment Runbook
+# Production Deployment Runbook
 
 ## Target
 

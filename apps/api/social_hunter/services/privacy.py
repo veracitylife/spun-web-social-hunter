@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 
 
 def target_hash(target: str) -> str:

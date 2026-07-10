@@ -1,4 +1,4 @@
-﻿# Cost Model
+# Cost Model
 
 ## Lean Education Deployment
 

@@ -36,4 +36,3 @@ async def username_lookup(username: str) -> list[Finding]:
         )
 
     return findings
-

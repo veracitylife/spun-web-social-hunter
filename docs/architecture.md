@@ -1,4 +1,4 @@
-﻿# Architecture
+# Architecture
 
 ## Service Boundaries
 
