@@ -1,6 +1,6 @@
-﻿# Social Hunter
+# Social Hunter
 
-Current version: `0.1.1`
+Current version: `0.1.2`
 
 
 Social Hunter is an educational OSINT aggregation platform scaffold for username, email, domain, IP, and phone lookups. It is built around source attribution, confidence scoring, normalized evidence, exports, and operator auditability.
@@ -99,3 +99,4 @@ Versioning starts at `0.1.1`. Each major contribution or release milestone incre
 - Member gateway: `/members/`
 - Admin gateway: `/social-hunter-admin`
 - PayPal receiving account: `techpronow@gmail.com`
+

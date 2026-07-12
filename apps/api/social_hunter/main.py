@@ -95,6 +95,11 @@ async def admin_login(request: LoginRequest) -> AuthResponse:
     audit_events.append({"actor": request.username, "action": "admin_login", "status": "demo_ok"})
     return AuthResponse(ok=True, role="admin", display_name=request.username, token="demo-admin-session", message="Demo admin session issued. Replace with production auth before launch.")
 
+@app.post("/api/auth/admin/password-reset")
+async def admin_password_reset(request: PasswordResetRequest) -> dict[str, str]:
+    audit_events.append({"actor": request.email, "action": "admin_password_reset_requested", "status": "queued"})
+    return {"status": "queued", "message": "Admin password reset email flow is queued for mail-provider wiring."}
+
 
 @app.post("/api/contact", response_model=ContactSubmissionRecord)
 async def submit_contact(request: ContactSubmission) -> ContactSubmissionRecord:
