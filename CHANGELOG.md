@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6 - 2026-07-12
+
+- Finished member dashboard account and billing surfaces with live account summary, plan details, source health, recent jobs, and PayPal checkout wiring.
+- Finished admin dashboard overview, users/tenant management, and mail settings pages against live backend endpoints.
+- Wired member signup requests to backend signup and PayPal checkout flows instead of a static form.
+
 ## 0.1.5 - 2026-07-12
 
 - Added an admin proxy connection tester that checks each imported proxy against a configurable public target URL.

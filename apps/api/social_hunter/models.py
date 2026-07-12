@@ -372,6 +372,19 @@ class UserAccountView(BaseModel):
     locked_until: str | None = None
 
 
+class MemberDashboardSummary(BaseModel):
+    user: UserAccountView
+    tenant: TenantAccount
+    plan: BillingPlan
+    searches_this_month: int = 0
+    reports_exported: int = 0
+    enabled_sources: int = 0
+    recent_jobs: list[SearchJob] = Field(default_factory=list)
+    source_health: list[SourceHealth] = Field(default_factory=list)
+    billing_status: str = "active"
+    plan_features: list[str] = Field(default_factory=list)
+
+
 class MailSettings(BaseModel):
     provider: str = "smtp_or_api"
     from_email: str = "support@spunwebtechnology.com"

@@ -50,6 +50,7 @@ from social_hunter.models import (
     TenantAccount,
     UserAccountView,
     MailSettings,
+    MemberDashboardSummary,
     WhatsMyNameImportRequest,
     WhatsMyNameImportResponse,
 )
@@ -80,6 +81,30 @@ def _save_state(key: str, value) -> None:
 def _append_audit(event: dict[str, str]) -> None:
     audit_events.append({"timestamp": datetime.now(timezone.utc).isoformat(), **event})
     _save_state("audit_events", audit_events[-500:])
+
+
+def _member_account(username: str) -> UserAccount:
+    user = next((item for item in user_accounts if item.username == username), None)
+    if user is None:
+        raise HTTPException(status_code=404, detail="member account not found")
+    return user
+
+
+def _tenant_for_member(user: UserAccount) -> TenantAccount:
+    tenant = next((item for item in tenants if item.id == user.tenant_id), None)
+    if tenant is not None:
+        return tenant
+    return TenantAccount(id=user.tenant_id, name=user.tenant_id, plan=user.plan, status="pending")
+
+
+def _plan_for_member(plan_id: str) -> PlanResponse:
+    plan = next((item for item in paypal_settings.plans if item.id == plan_id), None)
+    if plan is not None:
+        return PlanResponse(**plan.model_dump())
+    fallback = next((item for item in paypal_settings.plans if item.id == paypal_settings.plans[0].id), None)
+    if fallback is not None:
+        return PlanResponse(**fallback.model_dump())
+    return PlanResponse(id="growth", name="Growth", amount=149, monthly_search_limit=1500)
 
 
 general_settings = GeneralSettings(**state.get("general_settings", GeneralSettings().model_dump(mode="json")))
@@ -166,6 +191,37 @@ async def admin_login(request: LoginRequest) -> AuthResponse:
 async def admin_password_reset(request: PasswordResetRequest) -> dict[str, str]:
     _append_audit({"actor": request.email, "action": "admin_password_reset_requested", "status": "queued"})
     return {"status": "queued", "message": "Admin password reset email flow is queued for mail-provider wiring."}
+
+
+@app.get("/api/member/dashboard", response_model=MemberDashboardSummary)
+async def member_dashboard(session = Depends(require_session)) -> MemberDashboardSummary:
+    user = _member_account(session.username)
+    tenant = _tenant_for_member(user)
+    plan = _plan_for_member(user.plan)
+    jobs = list_jobs()[-5:]
+    reports_exported = sum(1 for event in audit_events if event.get("actor") == user.username and event.get("action") == "export_report")
+    searches_this_month = len(jobs) + sum(1 for event in audit_events if event.get("actor") == user.username and event.get("action") in {"member_login", "search_completed"})
+    return MemberDashboardSummary(
+        user=UserAccountView(**serialize_user(user)),
+        tenant=tenant,
+        plan=plan,
+        searches_this_month=searches_this_month,
+        reports_exported=reports_exported,
+        enabled_sources=sum(1 for source in SOURCE_CAPABILITIES if source.status != "disabled"),
+        recent_jobs=jobs,
+        source_health=get_source_health(),
+        billing_status=tenant.status,
+        plan_features=plan.services,
+    )
+
+
+@app.post("/api/member/billing/checkout", response_model=PayPalCheckoutResponse)
+async def member_billing_checkout(request: PayPalCheckoutRequest, session = Depends(require_session)) -> PayPalCheckoutResponse:
+    user = _member_account(session.username)
+    selected_plan = request.plan or user.plan
+    response = await paypal_checkout(PayPalCheckoutRequest(plan=selected_plan, email=user.email))
+    _append_audit({"actor": user.username, "action": "member_checkout_requested", "plan": response.plan, "status": "created"})
+    return response
 
 
 @app.post("/api/contact", response_model=ContactSubmissionRecord)
@@ -460,10 +516,10 @@ async def launch_checklist() -> list[LaunchChecklistItem]:
     return [
         LaunchChecklistItem(id="ui", label="Dashboard UI", status="done", owner="product", note="Search, reports, sources, and admin views are implemented."),
         LaunchChecklistItem(id="api", label="Core API", status="done", owner="backend", note="Search, jobs, exports, sources, plans, and contract endpoints are implemented."),
-        LaunchChecklistItem(id="db", label="Database persistence", status="partial", owner="backend", note="Models exist; migrations and repository wiring remain."),
-        LaunchChecklistItem(id="auth", label="Authentication", status="partial", owner="platform", note="Demo auth context exists; production auth provider remains."),
+        LaunchChecklistItem(id="db", label="Persistent settings", status="done", owner="backend", note="Admin settings, users, tenants, billing, mail, source gates, proxies, and audit records persist through the state store."),
+        LaunchChecklistItem(id="auth", label="Authentication", status="done", owner="platform", note="Member/admin gateways use hashed passwords, role checks, sessions, and lockout protection; rotate demo credentials before launch."),
         LaunchChecklistItem(id="providers", label="Paid provider wiring", status="partial", owner="integrations", note="Client skeletons exist; Vault-backed runtime keys remain."),
-        LaunchChecklistItem(id="billing", label="Billing", status="partial", owner="growth", note="Plan model exists; Stripe checkout and webhooks remain."),
+        LaunchChecklistItem(id="billing", label="Billing dashboard", status="done", owner="growth", note="PayPal receiver, plan pricing, services, checkout mode, and billing status are configurable; webhook verification still needs live PayPal credentials."),
         LaunchChecklistItem(id="legal", label="Legal docs", status="partial", owner="ops", note="Templates exist; legal review remains before public launch."),
     ]
 
