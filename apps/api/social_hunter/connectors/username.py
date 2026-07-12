@@ -36,3 +36,104 @@ async def username_lookup(username: str) -> list[Finding]:
         )
 
     return findings
+
+
+async def github_user_lookup(username: str) -> list[Finding]:
+    normalized = username.strip().lstrip("@")
+    return [
+        Finding(
+            source="GitHub REST Users API",
+            category="username_profile",
+            status=FindingStatus.skipped,
+            confidence=0,
+            title="GitHub public profile lookup not enabled",
+            url=f"https://github.com/{normalized}" if normalized else None,
+            evidence=(
+                "GitHub public profile lookup is wired to this adapter. Enable a Vault-backed "
+                "token reference when higher API limits or live metadata are required."
+            ),
+            compliance_flags=[
+                ComplianceFlag.public_source,
+                ComplianceFlag.api_terms_required,
+                ComplianceFlag.no_raw_secret,
+                ComplianceFlag.no_bypass,
+            ],
+        )
+    ]
+
+
+async def reddit_profile_lookup(username: str) -> list[Finding]:
+    normalized = username.strip().removeprefix("u/").lstrip("@")
+    return [
+        Finding(
+            source="Reddit API",
+            category="username_profile",
+            status=FindingStatus.skipped,
+            confidence=0,
+            title="Reddit public profile lookup not enabled",
+            url=f"https://www.reddit.com/user/{normalized}/" if normalized else None,
+            evidence=(
+                "Reddit username lookup is wired to this adapter. Enable approved Reddit API "
+                "credentials before live public profile metadata checks."
+            ),
+            compliance_flags=[
+                ComplianceFlag.public_source,
+                ComplianceFlag.api_terms_required,
+                ComplianceFlag.no_raw_secret,
+                ComplianceFlag.no_bypass,
+            ],
+        )
+    ]
+
+
+async def x_user_lookup(username: str) -> list[Finding]:
+    normalized = username.strip().lstrip("@")
+    return [
+        Finding(
+            source="X API user lookup",
+            category="username_profile",
+            status=FindingStatus.skipped,
+            confidence=0,
+            title="X public profile lookup not enabled",
+            url=f"https://x.com/{normalized}" if normalized else None,
+            evidence=(
+                "X username lookup is wired to this adapter. Enable an approved X API bearer "
+                "token through the Vault-backed API settings before live checks."
+            ),
+            compliance_flags=[
+                ComplianceFlag.public_source,
+                ComplianceFlag.api_terms_required,
+                ComplianceFlag.no_raw_secret,
+                ComplianceFlag.no_bypass,
+            ],
+        )
+    ]
+
+
+async def public_profile_source_lookup(username: str) -> list[Finding]:
+    normalized = username.strip().lstrip("@")
+    sources = [
+        ("GitLab", f"https://gitlab.com/{normalized}"),
+        ("Stack Overflow", f"https://stackoverflow.com/users/{normalized}"),
+        ("Mastodon", ""),
+    ]
+    return [
+        Finding(
+            source=name,
+            category="username_profile",
+            status=FindingStatus.skipped,
+            confidence=0,
+            title=f"{name} profile source slot",
+            url=url or None,
+            evidence=(
+                "Public profile source adapter is wired. Configure source-specific official "
+                "APIs or public URL checks before enabling live lookup."
+            ),
+            compliance_flags=[
+                ComplianceFlag.public_source,
+                ComplianceFlag.no_raw_secret,
+                ComplianceFlag.no_bypass,
+            ],
+        )
+        for name, url in sources
+    ]

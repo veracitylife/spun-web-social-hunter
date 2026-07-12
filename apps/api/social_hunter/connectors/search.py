@@ -1,4 +1,4 @@
-﻿from social_hunter.models import ComplianceFlag, Finding, FindingStatus, TargetType
+from social_hunter.models import ComplianceFlag, Finding, FindingStatus, TargetType
 
 
 async def web_search_placeholder(target: str, target_type: TargetType) -> list[Finding]:
@@ -21,3 +21,7 @@ async def web_search_placeholder(target: str, target_type: TargetType) -> list[F
             ],
         )
     ]
+
+
+async def web_search_index_lookup(query: str) -> list[Finding]:
+    return await web_search_placeholder(query, TargetType.domain)

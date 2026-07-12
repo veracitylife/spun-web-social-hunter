@@ -26,6 +26,9 @@ from social_hunter.models import (
     PayPalCheckoutRequest,
     PayPalCheckoutResponse,
     PlanResponse,
+    ProviderConfig,
+    ProxyImportRequest,
+    ProxyRouteRule,
     ProxySettings,
     ProxyTestResponse,
     SearchJob,
@@ -33,10 +36,12 @@ from social_hunter.models import (
     SearchResponse,
     SignupRequest,
     SourceCapability,
+    SourceGate,
     SourceHealth,
 )
 from social_hunter.services.billing import PAYPAL_EMAIL, PLANS, paypal_checkout_url
 from social_hunter.services.jobs import create_job, get_job, list_jobs
+from social_hunter.services.provider_catalog import default_api_key_references, default_proxy_route_rules, provider_catalog
 from social_hunter.services.reports import render_markdown_report
 from social_hunter.services.source_health import get_source_health
 from social_hunter.sources import SOURCE_CAPABILITIES, engine_contract
@@ -44,15 +49,18 @@ from social_hunter.sources import SOURCE_CAPABILITIES, engine_contract
 settings = get_settings()
 
 general_settings = GeneralSettings()
-api_key_references: list[ApiKeyReference] = [
-    ApiKeyReference(provider="Hunter.io"),
-    ApiKeyReference(provider="People Data Labs"),
-    ApiKeyReference(provider="Have I Been Pwned"),
-    ApiKeyReference(provider="Twilio Lookup"),
-    ApiKeyReference(provider="Brave Search"),
-    ApiKeyReference(provider="Google Places"),
+api_key_references: list[ApiKeyReference] = default_api_key_references()
+source_gates: list[SourceGate] = [
+    SourceGate(
+        source_id=source.id,
+        enabled=source.status in {"ready", "stubbed"},
+        requires_approval=source.status == "needs_api_key",
+        note=source.terms_note,
+    )
+    for source in SOURCE_CAPABILITIES
 ]
 proxy_settings = ProxySettings()
+proxy_route_rules: list[ProxyRouteRule] = default_proxy_route_rules()
 contact_submissions: list[ContactSubmissionRecord] = []
 audit_events: list[dict[str, str]] = []
 
@@ -114,6 +122,24 @@ async def admin_contact_submissions() -> list[ContactSubmissionRecord]:
     return contact_submissions
 
 
+
+@app.get("/api/admin/provider-configs", response_model=list[ProviderConfig])
+async def admin_provider_configs() -> list[ProviderConfig]:
+    return provider_catalog()
+
+
+@app.get("/api/admin/settings/source-gates", response_model=list[SourceGate])
+async def get_source_gates() -> list[SourceGate]:
+    return source_gates
+
+
+@app.put("/api/admin/settings/source-gates", response_model=list[SourceGate])
+async def update_source_gates(request: list[SourceGate]) -> list[SourceGate]:
+    global source_gates
+    source_gates = request
+    audit_events.append({"actor": "admin", "action": "source_gates_updated", "status": "saved"})
+    return source_gates
+
 @app.get("/api/admin/settings/general", response_model=GeneralSettings)
 async def get_general_settings() -> GeneralSettings:
     return general_settings
@@ -142,8 +168,21 @@ async def update_api_key_references(request: list[ApiKeyReference]) -> list[ApiK
 
 @app.post("/api/admin/settings/api-keys/test")
 async def test_api_key_reference(request: ApiKeyTestRequest) -> dict[str, str | bool]:
-    ok = request.vault_reference.startswith("VAULT_REF_") or request.vault_reference == ""
-    return {"ok": ok, "provider": request.provider, "message": "Vault reference accepted for configuration. Live provider test requires Vault runtime integration."}
+    catalog_by_id = {provider.id: provider for provider in provider_catalog()}
+    provider = catalog_by_id.get(request.provider_id)
+    ref = request.vault_reference.strip()
+    no_secret_required = request.credential_type == "none"
+    ok = no_secret_required or (ref.startswith("VAULT_REF_") and ref != "VAULT_REF_PROVIDER_KEY")
+    connector_function = provider.connector_function if provider else "unmapped"
+    message = (
+        "No API credential required; connector function is mapped."
+        if no_secret_required
+        else "Vault reference accepted; live provider calls require Vault runtime secret resolution."
+        if ok
+        else "Use a Vault reference such as VAULT_REF_PROVIDER_KEY. Do not paste raw API keys."
+    )
+    audit_events.append({"actor": "admin", "action": "api_key_reference_tested", "provider": request.provider, "status": "ok" if ok else "needs_vault_ref"})
+    return {"ok": ok, "provider": request.provider, "provider_id": request.provider_id, "connector_function": connector_function, "message": message}
 
 
 @app.get("/api/admin/settings/proxies", response_model=ProxySettings)
@@ -159,10 +198,39 @@ async def update_proxy_settings(request: ProxySettings) -> ProxySettings:
     return proxy_settings
 
 
+@app.post("/api/admin/settings/proxies/import", response_model=ProxySettings)
+async def import_proxy_settings(request: ProxyImportRequest) -> ProxySettings:
+    global proxy_settings
+    entries = [line.strip() for line in request.entries_text.splitlines() if line.strip() and not line.strip().startswith("#")]
+    proxy_settings.manual_entries = entries
+    audit_events.append({"actor": "admin", "action": "proxy_entries_imported", "status": "saved", "count": str(len(entries))})
+    return proxy_settings
+
+
+@app.get("/api/admin/settings/proxies/routes", response_model=list[ProxyRouteRule])
+async def get_proxy_route_rules() -> list[ProxyRouteRule]:
+    return proxy_route_rules
+
+
+@app.put("/api/admin/settings/proxies/routes", response_model=list[ProxyRouteRule])
+async def update_proxy_route_rules(request: list[ProxyRouteRule]) -> list[ProxyRouteRule]:
+    global proxy_route_rules
+    proxy_route_rules = request
+    audit_events.append({"actor": "admin", "action": "proxy_route_rules_updated", "status": "saved"})
+    return proxy_route_rules
+
+
 @app.post("/api/admin/settings/proxies/test", response_model=ProxyTestResponse)
 async def test_proxy_settings(request: ProxySettings) -> ProxyTestResponse:
-    valid = sum(1 for entry in request.manual_entries if len(entry.split(":")) >= 2)
-    return ProxyTestResponse(ok=valid == len(request.manual_entries), tested=len(request.manual_entries), valid_format=valid, message="Format validation complete. Network proxy testing should run only for approved provider egress.")
+    invalid_entries = [entry for entry in request.manual_entries if len(entry.split(":")) < 2]
+    valid = len(request.manual_entries) - len(invalid_entries)
+    return ProxyTestResponse(
+        ok=len(invalid_entries) == 0,
+        tested=len(request.manual_entries),
+        valid_format=valid,
+        invalid_entries=invalid_entries,
+        message="Format validation complete. Use proxies only for allowlisted provider API egress; bypass/evasion use is not supported.",
+    )
 
 
 @app.get("/api/admin/audit")

@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Literal
 from uuid import UUID, uuid4
@@ -201,13 +201,44 @@ class GeneralSettings(BaseModel):
 
 class ApiKeyReference(BaseModel):
     provider: str
+    provider_id: str = ""
+    source_id: str = ""
+    credential_type: str = "api_key"
+    connector_function: str = ""
     vault_reference: str = Field(default="", max_length=255)
     enabled: bool = False
+    notes: str = ""
 
 
 class ApiKeyTestRequest(BaseModel):
     provider: str
+    provider_id: str = ""
+    credential_type: str = "api_key"
     vault_reference: str = Field(default="", max_length=255)
+
+
+class ProviderConfig(BaseModel):
+    id: str
+    name: str
+    category: str
+    source_id: str
+    target_types: list[TargetType]
+    status: Literal["ready", "stubbed", "needs_api_key", "disabled"]
+    connector_function: str
+    credential_refs: list[str] = Field(default_factory=list)
+    admin_section: str
+    proxy_route_supported: bool = False
+    terms_note: str
+    data_returned: list[str]
+    note: str = ""
+
+
+class SourceGate(BaseModel):
+    source_id: str
+    enabled: bool = False
+    requires_approval: bool = True
+    tenant_plan: str = "operator"
+    note: str = ""
 
 
 class ProxySettings(BaseModel):
@@ -219,10 +250,26 @@ class ProxySettings(BaseModel):
     health_check_interval_minutes: int = 30
 
 
+class ProxyImportRequest(BaseModel):
+    entries_text: str = Field(default="", max_length=20000)
+
+
+class ProxyRouteRule(BaseModel):
+    id: str
+    label: str
+    category: str
+    enabled: bool = False
+    proxy_required: bool = False
+    provider_ids: list[str] = Field(default_factory=list)
+    allowed_domains: list[str] = Field(default_factory=list)
+    note: str = ""
+
+
 class ProxyTestResponse(BaseModel):
     ok: bool
     tested: int
     valid_format: int
+    invalid_entries: list[str] = Field(default_factory=list)
     message: str
 
 

@@ -1,4 +1,4 @@
-﻿from functools import lru_cache
+from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     builtwith_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
     wappalyzer_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
     dnsdb_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
+    fullcontact_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
+    external_engine_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
 
     @property
     def cors_origins(self) -> list[str]:
