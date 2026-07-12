@@ -10,25 +10,51 @@ from social_hunter import __version__
 from social_hunter.config import get_settings
 from social_hunter.connectors.registry import run_connectors
 from social_hunter.models import (
+    ApiKeyReference,
+    ApiKeyTestRequest,
+    AuthResponse,
+    ContactSubmission,
+    ContactSubmissionRecord,
     EngineHandoffContract,
     ExportRequest,
     ExportResponse,
+    GeneralSettings,
     HealthResponse,
     LaunchChecklistItem,
+    LoginRequest,
+    PasswordResetRequest,
+    PayPalCheckoutRequest,
+    PayPalCheckoutResponse,
     PlanResponse,
+    ProxySettings,
+    ProxyTestResponse,
     SearchJob,
     SearchRequest,
     SearchResponse,
+    SignupRequest,
     SourceCapability,
     SourceHealth,
 )
-from social_hunter.services.billing import PLANS
+from social_hunter.services.billing import PAYPAL_EMAIL, PLANS, paypal_checkout_url
 from social_hunter.services.jobs import create_job, get_job, list_jobs
 from social_hunter.services.reports import render_markdown_report
 from social_hunter.services.source_health import get_source_health
 from social_hunter.sources import SOURCE_CAPABILITIES, engine_contract
 
 settings = get_settings()
+
+general_settings = GeneralSettings()
+api_key_references: list[ApiKeyReference] = [
+    ApiKeyReference(provider="Hunter.io"),
+    ApiKeyReference(provider="People Data Labs"),
+    ApiKeyReference(provider="Have I Been Pwned"),
+    ApiKeyReference(provider="Twilio Lookup"),
+    ApiKeyReference(provider="Brave Search"),
+    ApiKeyReference(provider="Google Places"),
+]
+proxy_settings = ProxySettings()
+contact_submissions: list[ContactSubmissionRecord] = []
+audit_events: list[dict[str, str]] = []
 
 app = FastAPI(
     title="Social Hunter API",
@@ -43,6 +69,108 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+@app.post("/api/auth/member/login", response_model=AuthResponse)
+async def member_login(request: LoginRequest) -> AuthResponse:
+    audit_events.append({"actor": request.username, "action": "member_login", "status": "demo_ok"})
+    return AuthResponse(ok=True, role="member", display_name=request.username, token="demo-member-session", message="Demo member session issued. Replace with production auth before launch.")
+
+
+@app.post("/api/auth/member/password-reset")
+async def member_password_reset(request: PasswordResetRequest) -> dict[str, str]:
+    audit_events.append({"actor": request.email, "action": "password_reset_requested", "status": "queued"})
+    return {"status": "queued", "message": "Password reset email flow is queued for mail-provider wiring."}
+
+
+@app.post("/api/auth/member/signup")
+async def member_signup(request: SignupRequest) -> dict[str, str]:
+    contact_submissions.append(ContactSubmissionRecord(name=request.name, email=request.email, company=request.company, message=f"Signup request for {request.plan} plan"))
+    audit_events.append({"actor": request.email, "action": "member_signup_requested", "plan": request.plan})
+    return {"status": "received", "message": "Signup request received. Activate account after payment confirmation."}
+
+
+@app.post("/api/auth/admin/login", response_model=AuthResponse)
+async def admin_login(request: LoginRequest) -> AuthResponse:
+    audit_events.append({"actor": request.username, "action": "admin_login", "status": "demo_ok"})
+    return AuthResponse(ok=True, role="admin", display_name=request.username, token="demo-admin-session", message="Demo admin session issued. Replace with production auth before launch.")
+
+
+@app.post("/api/contact", response_model=ContactSubmissionRecord)
+async def submit_contact(request: ContactSubmission) -> ContactSubmissionRecord:
+    record = ContactSubmissionRecord(**request.model_dump())
+    contact_submissions.append(record)
+    audit_events.append({"actor": request.email, "action": "contact_submission", "status": "new"})
+    return record
+
+
+@app.get("/api/admin/contact-submissions", response_model=list[ContactSubmissionRecord])
+async def admin_contact_submissions() -> list[ContactSubmissionRecord]:
+    return contact_submissions
+
+
+@app.get("/api/admin/settings/general", response_model=GeneralSettings)
+async def get_general_settings() -> GeneralSettings:
+    return general_settings
+
+
+@app.put("/api/admin/settings/general", response_model=GeneralSettings)
+async def update_general_settings(request: GeneralSettings) -> GeneralSettings:
+    global general_settings
+    general_settings = request
+    audit_events.append({"actor": "admin", "action": "general_settings_updated", "status": "saved"})
+    return general_settings
+
+
+@app.get("/api/admin/settings/api-keys", response_model=list[ApiKeyReference])
+async def get_api_key_references() -> list[ApiKeyReference]:
+    return api_key_references
+
+
+@app.put("/api/admin/settings/api-keys", response_model=list[ApiKeyReference])
+async def update_api_key_references(request: list[ApiKeyReference]) -> list[ApiKeyReference]:
+    global api_key_references
+    api_key_references = request
+    audit_events.append({"actor": "admin", "action": "api_key_references_updated", "status": "saved"})
+    return api_key_references
+
+
+@app.post("/api/admin/settings/api-keys/test")
+async def test_api_key_reference(request: ApiKeyTestRequest) -> dict[str, str | bool]:
+    ok = request.vault_reference.startswith("VAULT_REF_") or request.vault_reference == ""
+    return {"ok": ok, "provider": request.provider, "message": "Vault reference accepted for configuration. Live provider test requires Vault runtime integration."}
+
+
+@app.get("/api/admin/settings/proxies", response_model=ProxySettings)
+async def get_proxy_settings() -> ProxySettings:
+    return proxy_settings
+
+
+@app.put("/api/admin/settings/proxies", response_model=ProxySettings)
+async def update_proxy_settings(request: ProxySettings) -> ProxySettings:
+    global proxy_settings
+    proxy_settings = request
+    audit_events.append({"actor": "admin", "action": "proxy_settings_updated", "status": "saved"})
+    return proxy_settings
+
+
+@app.post("/api/admin/settings/proxies/test", response_model=ProxyTestResponse)
+async def test_proxy_settings(request: ProxySettings) -> ProxyTestResponse:
+    valid = sum(1 for entry in request.manual_entries if len(entry.split(":")) >= 2)
+    return ProxyTestResponse(ok=valid == len(request.manual_entries), tested=len(request.manual_entries), valid_format=valid, message="Format validation complete. Network proxy testing should run only for approved provider egress.")
+
+
+@app.get("/api/admin/audit")
+async def admin_audit() -> list[dict[str, str]]:
+    return audit_events[-100:]
+
+
+@app.post("/api/billing/paypal/checkout", response_model=PayPalCheckoutResponse)
+async def paypal_checkout(request: PayPalCheckoutRequest) -> PayPalCheckoutResponse:
+    plan_id = request.plan.lower()
+    if plan_id not in PLANS:
+        raise HTTPException(status_code=400, detail="invalid plan")
+    return PayPalCheckoutResponse(plan=plan_id, paypal_email=PAYPAL_EMAIL, checkout_url=paypal_checkout_url(plan_id), message="Redirect user to PayPal and activate after verified payment confirmation.")
 
 
 @app.get("/health", response_model=HealthResponse)
