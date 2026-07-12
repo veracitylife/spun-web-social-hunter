@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.9 - 2026-07-13
+
+- Replaced the public platform-controls block with sales-focused value copy.
+- Added a public questions-and-answers section for prospects.
+- Removed setup-oriented password reset and contact wording from public-facing surfaces.
+- Kept the six operational controls in the app while moving their details into protected admin/member areas.
+
 ## 0.1.8 - 2026-07-13
 
 - Added live role verification before rendering member or admin dashboard UI.

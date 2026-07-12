@@ -179,7 +179,7 @@ async def member_verify(session = Depends(require_member)) -> dict[str, str | bo
 @app.post("/api/auth/member/password-reset")
 async def member_password_reset(request: PasswordResetRequest) -> dict[str, str]:
     _append_audit({"actor": request.email, "action": "password_reset_requested", "status": "queued"})
-    return {"status": "queued", "message": "Password reset email flow is queued for mail-provider wiring."}
+    return {"status": "received", "message": "If a matching account exists, password reset instructions will be sent."}
 
 
 @app.post("/api/auth/member/signup")
@@ -209,7 +209,7 @@ async def admin_verify(session = Depends(require_admin)) -> dict[str, str | bool
 @app.post("/api/auth/admin/password-reset")
 async def admin_password_reset(request: PasswordResetRequest) -> dict[str, str]:
     _append_audit({"actor": request.email, "action": "admin_password_reset_requested", "status": "queued"})
-    return {"status": "queued", "message": "Admin password reset email flow is queued for mail-provider wiring."}
+    return {"status": "received", "message": "If a matching admin account exists, password reset instructions will be sent."}
 
 
 @app.get("/api/member/dashboard", response_model=MemberDashboardSummary)
