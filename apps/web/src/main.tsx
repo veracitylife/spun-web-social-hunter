@@ -1,399 +1,53 @@
-﻿import React from "react";
+﻿
+import React from "react";
 import ReactDOM from "react-dom/client";
-import {
-  Activity,
-  Archive,
-  Database,
-  Download,
-  FileDown,
-  Gauge,
-  LockKeyhole,
-  Search,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
+import { Activity, Archive, CheckCircle2, CreditCard, Database, FileDown, Gauge, KeyRound, LockKeyhole, Mail, Menu, Network, Search, Settings, ShieldCheck, SlidersHorizontal, UserPlus, UserRound, UsersRound, X } from "lucide-react";
 import "./styles.css";
 
+type Route = "home" | "members" | "admin";
+type MemberView = "dashboard" | "search" | "reports" | "sources";
+type AdminView = "overview" | "general" | "api" | "proxy" | "mail" | "users" | "billing" | "audit";
 type TargetType = "username" | "email" | "domain" | "ip" | "phone";
-type FindingStatus = "found" | "not_found" | "unknown" | "skipped" | "error";
-type View = "search" | "reports" | "sources" | "admin";
+type Finding = { id: string; source: string; category: string; status: string; confidence: number; title: string; evidence: string; url?: string; compliance_flags: string[] };
 
-type SourceHealth = { source_id: string; status: "healthy" | "degraded" | "disabled" | "needs_key"; latency_ms?: number | null; last_checked_at: string; note: string; };
-
-type PlanResponse = { id: string; name: string; monthly_search_limit: number; export_enabled: boolean; api_access_enabled: boolean; };
-
-type LaunchChecklistItem = { id: string; label: string; status: "done" | "partial" | "blocked" | "todo"; owner: string; note: string; };
-
-type Finding = {
-  id: string;
-  source: string;
-  category: string;
-  status: FindingStatus;
-  confidence: number;
-  title: string;
-  url?: string;
-  evidence: string;
-  checked_at: string;
-  compliance_flags: string[];
-};
-
-type SearchResponse = {
-  id: string;
-  target_type: TargetType;
-  target: string;
-  status: string;
-  findings: Finding[];
-  generated_at: string;
-  next_actions: string[];
-};
-
-type SourceCapability = {
-  id: string;
-  name: string;
-  category: string;
-  target_types: TargetType[];
-  status: "ready" | "stubbed" | "needs_api_key" | "disabled";
-  terms_note: string;
-  data_returned: string[];
-  raw_payload_storage_allowed: boolean;
-};
-
-type EngineContract = {
-  version: string;
-  accepted_input: Record<string, string>;
-  expected_output_fields: string[];
-  prohibited_capabilities: string[];
-  integration_notes: string[];
-};
-
+type Workspace = ReturnType<typeof useWorkspace>;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-
-const sampleSearch: SearchResponse = {
-  id: "demo-search",
-  target_type: "username",
-  target: "socialhunter",
-  status: "completed",
-  generated_at: new Date().toISOString(),
-  next_actions: ["Verify high-confidence findings manually before operational use."],
-  findings: [
-    {
-      id: "sample-1",
-      source: "GitHub",
-      category: "developer",
-      status: "found",
-      confidence: 0.86,
-      title: "GitHub profile check",
-      url: "https://github.com/socialhunter",
-      evidence: "Demo fixture indicates a likely public profile.",
-      checked_at: new Date().toISOString(),
-      compliance_flags: ["public_source", "no_bypass", "no_raw_secret"],
-    },
-    {
-      id: "sample-2",
-      source: "Have I Been Pwned",
-      category: "breach",
-      status: "skipped",
-      confidence: 0,
-      title: "HIBP breach lookup not enabled",
-      evidence: "Add a Vault-backed API key and terms review before enabling live breach lookup.",
-      checked_at: new Date().toISOString(),
-      compliance_flags: ["api_terms_required", "no_raw_secret", "no_bypass"],
-    },
-  ],
-};
-
-const fallbackSources: SourceCapability[] = [
-  {
-    id: "whatsmyname-import",
-    name: "WhatsMyName Dataset Import",
-    category: "username",
-    target_types: ["username"],
-    status: "stubbed",
-    terms_note: "Use the published dataset under its project license and preserve attribution.",
-    data_returned: ["source", "profile_url", "existence_signal", "confidence"],
-    raw_payload_storage_allowed: false,
-  },
-  {
-    id: "external-engine-slot",
-    name: "Separate Engine Slot",
-    category: "external",
-    target_types: ["username", "email", "domain", "ip", "phone"],
-    status: "disabled",
-    terms_note: "Only attach lawful, authorized, terms-compliant engines.",
-    data_returned: ["normalized_findings"],
-    raw_payload_storage_allowed: false,
-  },
-];
-
-function App() {
-  const [view, setView] = React.useState<View>("search");
-  const [targetType, setTargetType] = React.useState<TargetType>("username");
-  const [target, setTarget] = React.useState("socialhunter");
-  const [consent, setConsent] = React.useState(true);
-  const [lastSearch, setLastSearch] = React.useState<SearchResponse>(sampleSearch);
-  const [selectedId, setSelectedId] = React.useState(sampleSearch.findings[0].id);
-  const [sources, setSources] = React.useState<SourceCapability[]>(fallbackSources);
-  const [sourceHealth, setSourceHealth] = React.useState<SourceHealth[]>([]);
-  const [plans, setPlans] = React.useState<PlanResponse[]>([]);
-  const [checklist, setChecklist] = React.useState<LaunchChecklistItem[]>([]);
-  const [categoryFilter, setCategoryFilter] = React.useState("all");
-  const [contract, setContract] = React.useState<EngineContract | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-
-  React.useEffect(() => {
-    fetch(`${API_BASE_URL}/api/sources`).then((res) => res.json()).then(setSources).catch(() => undefined);
-    fetch(`${API_BASE_URL}/api/engine-contract`).then((res) => res.json()).then(setContract).catch(() => undefined);
-    fetch(`${API_BASE_URL}/api/sources/health`).then((res) => res.json()).then(setSourceHealth).catch(() => undefined);
-    fetch(`${API_BASE_URL}/api/plans`).then((res) => res.json()).then(setPlans).catch(() => undefined);
-    fetch(`${API_BASE_URL}/api/admin/launch-checklist`).then((res) => res.json()).then(setChecklist).catch(() => undefined);
-  }, []);
-
-  const categories = ["all", ...Array.from(new Set(lastSearch.findings.map((finding) => finding.category)))];
-  const results = categoryFilter === "all" ? lastSearch.findings : lastSearch.findings.filter((finding) => finding.category === categoryFilter);
-  const selected = results.find((finding) => finding.id === selectedId) ?? results[0];
-  const foundCount = results.filter((finding) => finding.status === "found").length;
-  const reviewCount = results.filter((finding) => finding.status === "unknown" || finding.status === "skipped").length;
-
-  async function runSearch(event: React.FormEvent) {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target_type: targetType,
-          target,
-          consent_confirmed: consent,
-          source_groups: ["username_profile", "email_intel", "phone_intel", "person_enrichment", "business_contact", "domain_intel", "web_search", "breach", "ip"],
-          dry_run: true,
-        }),
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({ detail: "Search failed" }));
-        throw new Error(body.detail ?? "Search failed");
-      }
-
-      const data = (await response.json()) as SearchResponse;
-      setLastSearch(data);
-      setSelectedId(data.findings[0]?.id ?? "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Search failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function exportReport(format: "json" | "csv" | "markdown") {
-    const response = await fetch(`${API_BASE_URL}/api/export`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ search: lastSearch, format }),
-    });
-    const data = await response.json();
-    const blob = new Blob([data.content], { type: data.content_type });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = data.filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
-
-  return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <ShieldCheck size={24} />
-          <span>Social Hunter</span>
-        </div>
-        <nav aria-label="Primary">
-          <button className={view === "search" ? "nav-item active" : "nav-item"} onClick={() => setView("search")}><Search size={18} />Search</button>
-          <button className={view === "reports" ? "nav-item active" : "nav-item"} onClick={() => setView("reports")}><Archive size={18} />Reports</button>
-          <button className={view === "sources" ? "nav-item active" : "nav-item"} onClick={() => setView("sources")}><Database size={18} />Sources</button>
-          <button className={view === "admin" ? "nav-item active" : "nav-item"} onClick={() => setView("admin")}><Gauge size={18} />Admin</button>
-        </nav>
-        <div className="policy-box">
-          <strong>Education build</strong>
-          <span>Public sources, approved APIs, normalized evidence.</span>
-        </div>
-      </aside>
-
-      <section className="workspace">
-        <header className="topbar">
-          <div>
-            <h1>{viewLabels[view]}</h1>
-            <p>{viewSubtitles[view]}</p>
-          </div>
-          <div className="operator">
-            <UserRound size={18} />
-            <span>Analyst demo</span>
-          </div>
-        </header>
-
-        {view === "search" ? (
-          <>
-            <section className="search-panel" id="search">
-              <form onSubmit={runSearch}>
-                <div className="tabs" role="tablist" aria-label="Target type">
-                  {(["username", "email", "domain", "ip", "phone"] as TargetType[]).map((type) => (
-                    <button type="button" key={type} className={targetType === type ? "tab active" : "tab"} onClick={() => setTargetType(type)}>
-                      {type}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="search-row">
-                  <label>
-                    Target
-                    <input value={target} onChange={(event) => setTarget(event.target.value)} placeholder="username, email, domain, or IP" />
-                  </label>
-                  <button className="primary-button" type="submit" disabled={loading}>
-                    <Search size={18} />
-                    {loading ? "Searching" : "Run search"}
-                  </button>
-                </div>
-
-                <label className="consent-row">
-                  <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-                  Authorized educational use confirmed
-                </label>
-                {error ? <div className="error-state">{error}</div> : null}
-              </form>
-            </section>
-            <ResultsView results={results} selectedId={selectedId} selected={selected} foundCount={foundCount} reviewCount={reviewCount} setSelectedId={setSelectedId} exportReport={exportReport} categories={categories} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} />
-          </>
-        ) : null}
-
-        {view === "reports" ? <ReportsView search={lastSearch} exportReport={exportReport} jobsEnabled /> : null}
-        {view === "sources" ? <SourcesView sources={sources} health={sourceHealth} /> : null}
-        {view === "admin" ? <AdminView contract={contract} sources={sources} plans={plans} checklist={checklist} /> : null}
-      </section>
-    </main>
-  );
-}
-
-const viewLabels: Record<View, string> = {
-  search: "Search workspace",
-  reports: "Reports",
-  sources: "Source registry",
-  admin: "Admin controls",
-};
-
-const viewSubtitles: Record<View, string> = {
-  search: "Run source-attributed checks and review confidence-scored findings.",
-  reports: "Export normalized findings and review generated report metadata.",
-  sources: "Track source readiness, data returned, and terms notes.",
-  admin: "Review integration contract, safety boundaries, and launch blockers.",
-};
-
-function ResultsView(props: {
-  results: Finding[];
-  selectedId: string;
-  selected?: Finding;
-  foundCount: number;
-  reviewCount: number;
-  setSelectedId: (id: string) => void;
-  exportReport: (format: "json" | "csv" | "markdown") => void;
-  categories: string[];
-  categoryFilter: string;
-  setCategoryFilter: (category: string) => void;
-}) {
-  return (
-    <section className="dashboard-grid">
-      <section className="results-panel">
-        <div className="metric-strip">
-          <div><strong>{props.results.length}</strong><span>checks</span></div>
-          <div><strong>{props.foundCount}</strong><span>found</span></div>
-          <div><strong>{props.reviewCount}</strong><span>review</span></div>
-        </div>
-        <div className="filter-row"><span>Category</span>{props.categories.map((category) => <button key={category} className={props.categoryFilter === category ? "mini-tab active" : "mini-tab"} onClick={() => props.setCategoryFilter(category)}>{category}</button>)}</div><div className="table-wrap"><FindingsTable results={props.results} selectedId={props.selectedId} setSelectedId={props.setSelectedId} /></div>
-      </section>
-      <EvidencePanel selected={props.selected} exportReport={props.exportReport} />
-    </section>
-  );
-}
-
-function FindingsTable(props: { results: Finding[]; selectedId: string; setSelectedId: (id: string) => void }) {
-  return (
-    <table>
-      <thead><tr><th>Source</th><th>Category</th><th>Status</th><th>Confidence</th></tr></thead>
-      <tbody>
-        {props.results.map((finding) => (
-          <tr key={finding.id} className={finding.id === props.selectedId ? "selected" : ""} onClick={() => props.setSelectedId(finding.id)}>
-            <td>{finding.source}</td><td>{finding.category}</td><td><span className={`status ${finding.status}`}>{finding.status.replace("_", " ")}</span></td><td>{Math.round(finding.confidence * 100)}%</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function EvidencePanel(props: { selected?: Finding; exportReport: (format: "json" | "csv" | "markdown") => void }) {
-  if (!props.selected) return <aside className="detail-panel"><p className="empty-state">Select a finding to inspect evidence.</p></aside>;
-  return (
-    <aside className="detail-panel">
-      <div className="detail-header"><Activity size={20} /><div><h2>{props.selected.title}</h2><p>{props.selected.source}</p></div></div>
-      <div className="confidence"><span>Confidence</span><strong>{Math.round(props.selected.confidence * 100)}%</strong></div>
-      <p className="evidence">{props.selected.evidence}</p>
-      {props.selected.url ? <a className="source-link" href={props.selected.url} target="_blank" rel="noreferrer">Open source URL</a> : null}
-      <div className="flag-list">{props.selected.compliance_flags.map((flag) => <span key={flag}>{flag.replaceAll("_", " ")}</span>)}</div>
-      <div className="button-row"><button className="secondary-button" type="button" onClick={() => props.exportReport("json")}><FileDown size={18} />JSON</button><button className="secondary-button" type="button" onClick={() => props.exportReport("csv")}><Download size={18} />CSV</button><button className="secondary-button" type="button" onClick={() => props.exportReport("markdown")}><FileDown size={18} />MD</button></div>
-    </aside>
-  );
-}
-
-function ReportsView(props: { search: SearchResponse; exportReport: (format: "json" | "csv" | "markdown") => void; jobsEnabled: boolean }) {
-  return (
-    <section className="content-panel">
-      <div className="section-head"><h2>Latest report package</h2><p>Search ID {props.search.id}</p></div>
-      <div className="report-grid">
-        <div><strong>{props.search.target}</strong><span>target</span></div>
-        <div><strong>{props.search.findings.length}</strong><span>findings</span></div>
-        <div><strong>{new Date(props.search.generated_at).toLocaleString()}</strong><span>generated</span></div>
-      </div>
-      <div className="button-row left"><button className="primary-button" onClick={() => props.exportReport("json")}><FileDown size={18} />Export JSON</button><button className="secondary-button compact" onClick={() => props.exportReport("csv")}><Download size={18} />Export CSV</button><button className="secondary-button compact" onClick={() => props.exportReport("markdown")}><FileDown size={18} />Export Markdown</button></div>
-    </section>
-  );
-}
-
-function SourcesView(props: { sources: SourceCapability[]; health: SourceHealth[] }) {
-  return (
-    <section className="content-panel">
-      <div className="source-list">
-        {props.sources.map((source) => (
-          <article className="source-card" key={source.id}>
-            <div><h2>{source.name}</h2><p>{source.terms_note}</p></div>
-            <span className={`status ${source.status}`}>{source.status.replaceAll("_", " ")}</span>
-            <dl><dt>Targets</dt><dd>{source.target_types.join(", ")}</dd><dt>Returns</dt><dd>{source.data_returned.join(", ")}</dd><dt>Health</dt><dd>{props.health.find((item) => item.source_id === source.id)?.note ?? "Health loads from API."}</dd></dl>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function AdminView(props: { contract: EngineContract | null; sources: SourceCapability[]; plans: PlanResponse[]; checklist: LaunchChecklistItem[] }) {
-  return (
-    <section className="admin-grid">
-      <article className="content-panel">
-        <div className="section-head"><h2>Launch blockers</h2><p>Items to finish before production.</p></div>
-        <ul className="check-list">{(props.checklist.length ? props.checklist : []).map((item) => <li key={item.id}><strong>{item.label}</strong> - {item.status}: {item.note}</li>)}</ul>
-      </article>
-      <article className="content-panel">
-        <div className="section-head"><h2>Engine contract</h2><p>Version {props.contract?.version ?? "offline"}</p></div>
-        <div className="contract-box"><LockKeyhole size={18} /><span>{props.contract?.prohibited_capabilities.join("; ") ?? "Contract loads from the API when available."}</span></div>
-      </article>
-      <article className="content-panel wide">
-        <div className="section-head"><h2>Source readiness</h2><p>{props.sources.length} configured slots.</p></div>
-        <div className="readiness-row">{props.sources.map((source) => <span className={`status ${source.status}`} key={source.id}>{source.name}: {source.status.replaceAll("_", " ")}</span>)}</div><div className="plan-grid">{props.plans.map((plan) => <div key={plan.id}><strong>{plan.name}</strong><span>{plan.monthly_search_limit.toLocaleString()} searches/mo</span></div>)}</div>
-      </article>
-    </section>
-  );
-}
-
+const PAYPAL_EMAIL = "techpronow@gmail.com";
+const PAYPAL_URL = "https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=techpronow%40gmail.com&currency_code=USD&item_name=Social%20Hunter%20SaaS";
+const prices = [{ name: "Starter", price: "$49", searches: "250 searches" }, { name: "Growth", price: "$149", searches: "1,500 searches" }, { name: "Operator", price: "$399", searches: "7,500 searches" }];
+const recommendations = ["Add tenant-aware authentication with owner, analyst, billing, and read-only reviewer roles.", "Store provider credentials only as Vault-backed references and show health state, never raw keys.", "Use PayPal subscriptions plus verified webhooks before granting paid plan entitlements.", "Add audit logs for searches, exports, admin setting changes, and consent confirmations.", "Add source-level compliance controls by tenant, geography, provider, and use case.", "Add queued jobs, usage caps, and alerts so expensive enrichment APIs cannot be drained accidentally."];
+const sampleFindings: Finding[] = [{ id: "1", source: "GitHub", category: "developer", status: "found", confidence: 0.86, title: "GitHub profile check", url: "https://github.com/socialhunter", evidence: "Demo fixture indicates a likely public profile.", compliance_flags: ["public_source", "no_bypass", "no_raw_secret"] }, { id: "2", source: "HIBP", category: "breach", status: "skipped", confidence: 0, title: "Breach lookup not enabled", evidence: "Add a Vault-backed API key and terms review before enabling live breach lookup.", compliance_flags: ["api_terms_required", "no_raw_secret"] }];
+const fallbackSources = [{ id: "github", name: "GitHub Public Profiles", category: "username_profile", status: "ready" }, { id: "hunter", name: "Hunter.io", category: "email_intel", status: "needs_api_key" }, { id: "twilio", name: "Twilio Lookup", category: "phone_intel", status: "needs_api_key" }];
+function routeFromPath(): Route { const p = window.location.pathname.replace(/\/+$/, ""); if (p.endsWith("/members")) return "members"; if (p.endsWith("/social-hunter-admin")) return "admin"; return "home"; }
+function go(path: string) { window.history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); }
+function App() { const [route, setRoute] = React.useState<Route>(routeFromPath); const [menu, setMenu] = React.useState(false); React.useEffect(() => { const f = () => setRoute(routeFromPath()); window.addEventListener("popstate", f); return () => window.removeEventListener("popstate", f); }, []); return <><TopNav route={route} menu={menu} setMenu={setMenu} />{route === "home" && <Landing />}{route === "members" && <Members />}{route === "admin" && <Admin />}</>; }
+function TopNav({ route, menu, setMenu }: { route: Route; menu: boolean; setMenu: (v: boolean) => void }) { const links = [["Home", "/"], ["Members", "/members/"], ["Pricing", "/#pricing"], ["About", "/#about"], ["Contact", "/#contact"]]; return <header className="floating-nav"><button className="brand-button" onClick={() => go("/")}><ShieldCheck size={22} />Social Hunter</button><nav className={menu ? "nav-links open" : "nav-links"}>{links.map(([label, href]) => <a key={label} href={href} className={(route === "members" && label === "Members") || (route === "home" && label === "Home") ? "active" : ""} onClick={(e) => { e.preventDefault(); setMenu(false); go(href); }}>{label}</a>)}</nav><button className="icon-button mobile-only" onClick={() => setMenu(!menu)}>{menu ? <X /> : <Menu />}</button></header>; }
+function Landing() { return <main className="site-page"><section className="hero-section"><div className="hero-copy"><span className="eyebrow">Public-source intelligence for business teams</span><h1>Social Hunter</h1><p>Find, verify, and organize public contact, profile, domain, and company signals from approved APIs and public data sources.</p><div className="hero-actions"><button className="primary-button" onClick={() => go("/members/")}><UserRound size={18} />Member Login</button><a className="secondary-link" href="#pricing">View Pricing</a></div></div><ProductPreview /></section><section className="section-band" id="about"><SectionTitle eyebrow="Why clients use it" title="One workspace for compliant lead and account research." /><div className="benefit-grid"><Feature icon={<Search />} title="Find public signals" copy="Search usernames, emails, domains, phone numbers, IPs, and businesses from connected providers." /><Feature icon={<CheckCircle2 />} title="Validate before outreach" copy="Normalize records, score confidence, and separate verified results from weak signals." /><Feature icon={<Archive />} title="Export evidence" copy="Create clean reports for sales, recruiting, fraud review, and internal research workflows." /><Feature icon={<ShieldCheck />} title="Control compliance" copy="Keep sources gated by terms, consent, tenant plan, and admin-approved API credentials." /></div></section><section className="pricing-section" id="pricing"><SectionTitle centered eyebrow="Pricing" title="Simple monthly plans paid through PayPal." copy={`Payments route to ${PAYPAL_EMAIL}. Plan activation should be confirmed by admin until PayPal webhooks are connected.`} /><div className="pricing-grid">{prices.map((p) => <article className="price-card" key={p.name}><h3>{p.name}</h3><div className="price"><span>{p.price}</span>/mo</div><p>{p.searches} for lawful public-source research workflows.</p><a className="primary-button full" href={`${PAYPAL_URL}&amount=${p.price.replace("$", "")}`} target="_blank" rel="noreferrer"><CreditCard size={18} />Pay with PayPal</a></article>)}</div></section><section className="section-band recommendations"><SectionTitle eyebrow="Strong recommendations" title="Six upgrades before selling this as a production SaaS." /><ol className="recommendation-list">{recommendations.map((r) => <li key={r}>{r}</li>)}</ol></section><section className="contact-section" id="contact"><div><span className="eyebrow">Contact</span><h2>Request access or ask about a team rollout.</h2><p>Form submissions will appear in the admin contact mailbox once backend persistence is connected.</p></div><ContactForm /></section></main>; }
+function ProductPreview() { return <div className="hero-dashboard"><div className="browser-bar"><span /><span /><span /></div><div className="preview-search"><Search size={18} /><span>domain: clientcompany.com</span><strong>92%</strong></div><div className="preview-grid"><Metric label="Profiles checked" value="184" /><Metric label="Verified emails" value="37" /><Metric label="Risk flags" value="6" /></div><div className="preview-list"><Preview label="GitHub public profile" status="found" /><Preview label="Business records" status="found" /><Preview label="HIBP exposure check" status="review" /></div></div>; }
+function SectionTitle({ eyebrow, title, copy, centered }: { eyebrow: string; title: string; copy?: string; centered?: boolean }) { return <div className={centered ? "section-heading centered" : "section-heading"}><span className="eyebrow">{eyebrow}</span><h2>{title}</h2>{copy && <p>{copy}</p>}</div>; }
+function Feature({ icon, title, copy }: { icon: React.ReactNode; title: string; copy: string }) { return <article className="feature-card">{icon}<h3>{title}</h3><p>{copy}</p></article>; }
+function Metric({ label, value }: { label: string; value: string }) { return <div><strong>{value}</strong><span>{label}</span></div>; }
+function Preview({ label, status }: { label: string; status: string }) { return <div className="preview-row"><span>{label}</span><strong>{status}</strong></div>; }
+function Members() { const [signedIn, setSignedIn] = React.useState(false); const [view, setView] = React.useState<MemberView>("dashboard"); if (signedIn) return <MemberDashboard view={view} setView={setView} />; return <main className="auth-page"><section className="auth-layout"><div className="auth-panel"><span className="eyebrow">Members</span><h1>Sign in to your dashboard</h1><form className="form-stack" onSubmit={(e) => { e.preventDefault(); setSignedIn(true); }}><label>Username or email<input required autoComplete="username" placeholder="member@example.com" /></label><label>Password<input required type="password" autoComplete="current-password" placeholder="Password" /></label><button className="primary-button full"><LockKeyhole size={18} />Sign in</button><button className="text-button" type="button">Forgot password? Email reset instructions</button></form></div><div className="signup-panel"><UserPlus size={30} /><h2>Need an account?</h2><p>Create a member request and choose the plan that fits your search volume.</p><form className="form-stack"><label>Name<input placeholder="Your name" /></label><label>Email<input type="email" placeholder="you@company.com" /></label><label>Plan<select defaultValue="Growth"><option>Starter</option><option>Growth</option><option>Operator</option></select></label><a className="secondary-button full" href={PAYPAL_URL} target="_blank" rel="noreferrer"><CreditCard size={18} />Continue to PayPal</a></form></div></section></main>; }
+function Admin() { const [signedIn, setSignedIn] = React.useState(false); const [view, setView] = React.useState<AdminView>("overview"); if (signedIn) return <AdminDashboard view={view} setView={setView} />; return <main className="auth-page"><section className="auth-panel admin-login"><span className="eyebrow">Admin</span><h1>Social Hunter Admin</h1><p>Restricted configuration gateway for platform operators.</p><form className="form-stack" onSubmit={(e) => { e.preventDefault(); setSignedIn(true); }}><label>Admin username<input required autoComplete="username" /></label><label>Password<input required type="password" autoComplete="current-password" /></label><button className="primary-button full"><LockKeyhole size={18} />Enter admin dashboard</button></form></section></main>; }
+function useWorkspace() { const [targetType, setTargetType] = React.useState<TargetType>("username"); const [target, setTarget] = React.useState("socialhunter"); const [consent, setConsent] = React.useState(true); const [findings, setFindings] = React.useState<Finding[]>(sampleFindings); const [selectedId, setSelectedId] = React.useState("1"); const [sources, setSources] = React.useState(fallbackSources); const [category, setCategory] = React.useState("all"); const [loading, setLoading] = React.useState(false); const [error, setError] = React.useState(""); React.useEffect(() => { fetch(`${API_BASE_URL}/api/sources`).then((r) => r.json()).then(setSources).catch(() => undefined); }, []); async function runSearch(e: React.FormEvent) { e.preventDefault(); setLoading(true); setError(""); try { const res = await fetch(`${API_BASE_URL}/api/search`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target_type: targetType, target, consent_confirmed: consent, dry_run: true }) }); if (!res.ok) throw new Error("Search failed"); const data = await res.json(); setFindings(data.findings ?? sampleFindings); setSelectedId((data.findings ?? sampleFindings)[0]?.id ?? ""); } catch (err) { setError(err instanceof Error ? err.message : "Search failed"); } finally { setLoading(false); } } function exportReport(format: string) { const blob = new Blob([JSON.stringify({ target, findings, format }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `social-hunter-${format}.json`; a.click(); URL.revokeObjectURL(url); } const categories = ["all", ...Array.from(new Set(findings.map((f) => f.category)))]; const results = category === "all" ? findings : findings.filter((f) => f.category === category); const selected = results.find((f) => f.id === selectedId) ?? results[0]; return { targetType, setTargetType, target, setTarget, consent, setConsent, findings, selectedId, setSelectedId, sources, category, setCategory, loading, error, runSearch, exportReport, categories, results, selected }; }
+function Shell({ title, subtitle, nav, active, onNav, children }: { title: string; subtitle: string; nav: { id: string; label: string; icon: React.ReactNode }[]; active: string; onNav: (id: string) => void; children: React.ReactNode }) { return <main className="app-shell"><aside className="sidebar"><button className="brand side-brand" onClick={() => go("/")}><ShieldCheck size={24} />Social Hunter</button><nav>{nav.map((item) => <button key={item.id} className={active === item.id ? "nav-item active" : "nav-item"} onClick={() => onNav(item.id)}>{item.icon}{item.label}</button>)}</nav><div className="policy-box"><strong>Controlled workspace</strong><span>Approved sources, tenant controls, and evidence-first reporting.</span></div></aside><section className="workspace"><header className="topbar"><div><h1>{title}</h1><p>{subtitle}</p></div><button className="operator" onClick={() => go("/")}><UserRound size={18} />Exit</button></header>{children}</section></main>; }
+function MemberDashboard({ view, setView }: { view: MemberView; setView: (v: MemberView) => void }) { const w = useWorkspace(); return <Shell title="Member Dashboard" subtitle="Run searches, review reports, and monitor enabled data sources." nav={[{ id: "dashboard", label: "Dashboard", icon: <Gauge size={18} /> }, { id: "search", label: "Search", icon: <Search size={18} /> }, { id: "reports", label: "Reports", icon: <Archive size={18} /> }, { id: "sources", label: "Sources", icon: <Database size={18} /> }]} active={view} onNav={(id) => setView(id as MemberView)}>{view === "dashboard" && <MemberOverview w={w} />}{view === "search" && <SearchWorkspace w={w} />}{view === "reports" && <ReportsView w={w} />}{view === "sources" && <SourcesView sources={w.sources} />}</Shell>; }
+function AdminDashboard({ view, setView }: { view: AdminView; setView: (v: AdminView) => void }) { const w = useWorkspace(); return <Shell title="Admin Dashboard" subtitle="Configure SaaS settings, provider credentials, proxy lists, mail, billing, users, and audit controls." nav={[{ id: "overview", label: "Overview", icon: <Gauge size={18} /> }, { id: "general", label: "General Settings", icon: <Settings size={18} /> }, { id: "api", label: "API Keys", icon: <KeyRound size={18} /> }, { id: "proxy", label: "Proxy Config", icon: <Network size={18} /> }, { id: "mail", label: "Contact Mail", icon: <Mail size={18} /> }, { id: "users", label: "Users", icon: <UsersRound size={18} /> }, { id: "billing", label: "Billing", icon: <CreditCard size={18} /> }, { id: "audit", label: "Audit", icon: <Activity size={18} /> }]} active={view} onNav={(id) => setView(id as AdminView)}>{view === "overview" && <AdminOverview w={w} />}{view === "general" && <GeneralSettings />}{view === "api" && <ApiSettings sources={w.sources} />}{view === "proxy" && <ProxySettings />}{view === "mail" && <ContactMail />}{view === "users" && <UsersPage />}{view === "billing" && <BillingPage />}{view === "audit" && <AuditPage />}</Shell>; }
+function MemberOverview({ w }: { w: Workspace }) { return <section className="dashboard-grid single"><div className="metric-strip cards"><Metric label="Searches this month" value="184" /><Metric label="Reports exported" value="29" /><Metric label="Enabled sources" value={String(w.sources.filter((s) => s.status !== "disabled").length)} /></div><section className="content-panel"><SectionTitle eyebrow="Recent search" title={w.target} copy="Latest normalized source results." /><FindingsTable results={w.findings} selectedId={w.selectedId} setSelectedId={w.setSelectedId} /></section></section>; }
+function SearchWorkspace({ w }: { w: Workspace }) { const found = w.results.filter((f) => f.status === "found").length; const review = w.results.filter((f) => f.status === "unknown" || f.status === "skipped").length; return <><section className="search-panel"><form onSubmit={w.runSearch}><div className="tabs">{(["username", "email", "domain", "ip", "phone"] as TargetType[]).map((t) => <button type="button" key={t} className={w.targetType === t ? "tab active" : "tab"} onClick={() => w.setTargetType(t)}>{t}</button>)}</div><div className="search-row"><label>Target<input value={w.target} onChange={(e) => w.setTarget(e.target.value)} placeholder="username, email, domain, IP, or phone" /></label><button className="primary-button" disabled={w.loading}><Search size={18} />{w.loading ? "Searching" : "Run search"}</button></div><label className="consent-row"><input type="checkbox" checked={w.consent} onChange={(e) => w.setConsent(e.target.checked)} />Authorized business or educational use confirmed</label>{w.error && <div className="error-state">{w.error}</div>}</form></section><section className="dashboard-grid"><section className="results-panel"><div className="metric-strip"><Metric label="Checks" value={String(w.results.length)} /><Metric label="Found" value={String(found)} /><Metric label="Review" value={String(review)} /></div><div className="filter-row"><span>Category</span>{w.categories.map((c) => <button key={c} className={w.category === c ? "mini-tab active" : "mini-tab"} onClick={() => w.setCategory(c)}>{c}</button>)}</div><FindingsTable results={w.results} selectedId={w.selectedId} setSelectedId={w.setSelectedId} /></section><EvidencePanel selected={w.selected} exportReport={w.exportReport} /></section></>; }
+function FindingsTable({ results, selectedId, setSelectedId }: { results: Finding[]; selectedId: string; setSelectedId: (id: string) => void }) { return <div className="table-wrap"><table><thead><tr><th>Source</th><th>Category</th><th>Status</th><th>Confidence</th></tr></thead><tbody>{results.map((f) => <tr key={f.id} className={f.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(f.id)}><td>{f.source}</td><td>{f.category}</td><td><span className={`status ${f.status}`}>{f.status.replace("_", " ")}</span></td><td>{Math.round(f.confidence * 100)}%</td></tr>)}</tbody></table></div>; }
+function EvidencePanel({ selected, exportReport }: { selected?: Finding; exportReport: (f: string) => void }) { if (!selected) return <aside className="detail-panel"><p className="empty-state">Select a finding to inspect evidence.</p></aside>; return <aside className="detail-panel"><div className="detail-header"><Activity size={20} /><div><h2>{selected.title}</h2><p>{selected.source}</p></div></div><div className="confidence"><span>Confidence</span><strong>{Math.round(selected.confidence * 100)}%</strong></div><p className="evidence">{selected.evidence}</p>{selected.url && <a className="source-link" href={selected.url} target="_blank" rel="noreferrer">Open source URL</a>}<div className="flag-list">{selected.compliance_flags.map((flag) => <span key={flag}>{flag.replaceAll("_", " ")}</span>)}</div><div className="button-row"><button className="secondary-button" onClick={() => exportReport("json")}><FileDown size={18} />JSON</button><button className="secondary-button" onClick={() => exportReport("csv")}><FileDown size={18} />CSV</button></div></aside>; }
+function ReportsView({ w }: { w: Workspace }) { return <section className="content-panel"><SectionTitle eyebrow="Reports" title="Latest report package" copy="Export normalized evidence for review." /><div className="report-grid"><Metric label="Target" value={w.target} /><Metric label="Findings" value={String(w.findings.length)} /><Metric label="Generated" value={new Date().toLocaleString()} /></div><div className="button-row left"><button className="primary-button" onClick={() => w.exportReport("json")}><FileDown size={18} />Export JSON</button><button className="secondary-button compact" onClick={() => w.exportReport("csv")}>Export CSV</button></div></section>; }
+function SourcesView({ sources }: { sources: typeof fallbackSources }) { return <section className="content-panel"><div className="source-list">{sources.map((s) => <article className="source-card" key={s.id}><div><h2>{s.name}</h2><p>Provider category: {s.category}. Keep enabled only when terms, consent, and credentials are approved.</p></div><span className={`status ${s.status}`}>{s.status.replaceAll("_", " ")}</span><dl><dt>Category</dt><dd>{s.category}</dd><dt>Storage</dt><dd>Normalized evidence only</dd></dl></article>)}</div></section>; }
+function AdminOverview({ w }: { w: Workspace }) { return <section className="admin-grid"><article className="content-panel"><SectionTitle eyebrow="Admin" title="Launch checklist" /><ul className="check-list"><li><strong>Dashboard UI</strong> - done: public, member, and admin surfaces are present.</li><li><strong>Authentication</strong> - partial: forms exist; backend auth needs wiring.</li><li><strong>Billing</strong> - partial: PayPal links exist; webhooks need wiring.</li><li><strong>Provider keys</strong> - partial: Vault reference UI exists; backend save/test endpoints need wiring.</li></ul></article><article className="content-panel"><SectionTitle eyebrow="Contract" title="Engine controls" /><div className="contract-box"><LockKeyhole size={18} /><span>Use approved APIs and public sources. Keep provider credentials in Vault references only.</span></div></article><article className="content-panel wide"><SectionTitle eyebrow="Readiness" title={`${w.sources.length} source slots`} /><div className="readiness-row">{w.sources.map((s) => <span className={`status ${s.status}`} key={s.id}>{s.name}: {s.status.replaceAll("_", " ")}</span>)}</div></article></section>; }
+function SettingsPanel({ title, children }: { title: string; children: React.ReactNode }) { return <section className="content-panel settings-panel"><SectionTitle eyebrow="Settings" title={title} /><div className="form-stack">{children}</div></section>; }
+function GeneralSettings() { return <section className="settings-grid"><SettingsPanel title="General settings"><label>Application name<input defaultValue="Social Hunter" /></label><label>Public URL<input defaultValue="https://social-hunter.spunwebtechnology.com/" /></label><label>Support email<input defaultValue={PAYPAL_EMAIL} /></label><label>Default plan<select defaultValue="Growth"><option>Starter</option><option>Growth</option><option>Operator</option></select></label></SettingsPanel><SettingsPanel title="Search policy"><label><input type="checkbox" defaultChecked /> Require consent confirmation before search</label><label><input type="checkbox" defaultChecked /> Store normalized evidence only</label><label><input type="checkbox" defaultChecked /> Require approval for high-cost providers</label><label>Export retention<select defaultValue="90"><option value="30">30 days</option><option value="90">90 days</option><option value="365">365 days</option></select></label></SettingsPanel></section>; }
+function ApiSettings({ sources }: { sources: typeof fallbackSources }) { return <section className="settings-grid"><SettingsPanel title="API keys and tokens">{["Hunter.io", "People Data Labs", "Have I Been Pwned", "Twilio Lookup", "Brave Search", "Google Places"].map((p) => <div className="secret-row" key={p}><div><strong>{p}</strong><span>Vault reference required</span></div><input placeholder="VAULT_REF_PROVIDER_KEY" /><button className="secondary-button compact">Test</button></div>)}</SettingsPanel><SettingsPanel title="Source gates">{sources.map((s) => <label className="toggle-row" key={s.id}><input type="checkbox" defaultChecked={s.status !== "disabled"} /><span>{s.name}</span><em>{s.category}</em></label>)}</SettingsPanel></section>; }
+function ProxySettings() { return <section className="settings-grid"><SettingsPanel title="Proxy configuration"><label>Mode<select defaultValue="off"><option value="off">Off</option><option value="provider">Provider managed</option><option value="manual">Manual list</option></select></label><label>Manual import<textarea rows={7} placeholder="host:port:user:password, one per line" /></label><label>Import by file<input type="file" /></label><div className="button-row no-pad"><button className="secondary-button compact"><SlidersHorizontal size={18} />Validate format</button><button className="primary-button"><Network size={18} />Test proxies</button></div></SettingsPanel><SettingsPanel title="Proxy rules"><label><input type="checkbox" defaultChecked /> Use proxies only for allowlisted provider egress</label><label><input type="checkbox" defaultChecked /> Disable failed proxies after repeated connection errors</label><label><input type="checkbox" /> Require admin approval before enabling a proxy list</label><label>Health check interval<select defaultValue="30"><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option></select></label></SettingsPanel></section>; }
+function ContactMail() { const msgs = [{ name: "Maya Thompson", email: "maya@example.com", company: "Northpoint Recovery", subject: "Need a team plan", status: "new" }, { name: "Derek Hale", email: "derek@example.com", company: "Hale Digital", subject: "API source limits", status: "reviewed" }]; return <section className="content-panel"><SectionTitle eyebrow="Mail" title="Contact form submissions" copy="Route public contact and signup requests into this mailbox." /><div className="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Company</th><th>Subject</th><th>Status</th></tr></thead><tbody>{msgs.map((m) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{m.company}</td><td>{m.subject}</td><td><span className={`status ${m.status}`}>{m.status}</span></td></tr>)}</tbody></table></div></section>; }
+function UsersPage() { return <section className="content-panel"><SectionTitle eyebrow="Users" title="Members and roles" copy="Manage tenant access, roles, and dashboard permissions." /><div className="table-wrap"><table><thead><tr><th>User</th><th>Role</th><th>Plan</th><th>Status</th></tr></thead><tbody>{[{ n: "Ryan", r: "Owner", p: "Operator", s: "active" }, { n: "Demo Analyst", r: "Analyst", p: "Growth", s: "pending" }].map((u) => <tr key={u.n}><td>{u.n}</td><td>{u.r}</td><td>{u.p}</td><td><span className={`status ${u.s}`}>{u.s}</span></td></tr>)}</tbody></table></div></section>; }
+function BillingPage() { return <section className="content-panel"><SectionTitle eyebrow="Billing" title="Billing and plans" copy={`PayPal receiving account: ${PAYPAL_EMAIL}`} /><div className="plan-grid">{prices.map((p) => <div key={p.name}><strong>{p.name}</strong><span>{p.searches}/mo</span><span>{p.name === "Operator" ? "API access" : "Dashboard access"}</span></div>)}</div></section>; }
+function AuditPage() { return <section className="content-panel"><SectionTitle eyebrow="Audit" title="Audit and operations" copy="Track important events before they become support problems." /><ul className="check-list"><li><strong>Search audit</strong> - record target type, source set, user, plan, and consent state.</li><li><strong>Export audit</strong> - record file format, report ID, and tenant user.</li><li><strong>Admin audit</strong> - record settings changes and provider key health checks.</li></ul></section>; }
+function ContactForm() { return <form className="contact-form"><label>Name<input placeholder="Your name" /></label><label>Email<input type="email" placeholder="you@company.com" /></label><label>Company<input placeholder="Company" /></label><label>Message<textarea rows={5} placeholder="Tell us what you need Social Hunter to help with." /></label><button className="primary-button full" type="button"><Mail size={18} />Send request</button></form>; }
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
