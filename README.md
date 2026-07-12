@@ -1,6 +1,6 @@
 # Social Hunter
 
-Current version: `0.1.9`
+Current version: `0.1.10`
 
 
 Social Hunter is a managed public-source intelligence SaaS for username, email, domain, IP, business, and phone validation workflows. It is built around source attribution, confidence scoring, normalized evidence, exports, role-based access, billing controls, and operational auditability.

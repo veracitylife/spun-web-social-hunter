@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.10 - 2026-07-13
+
+- Added member onboarding preferences for use case, geography, source focus, first target, and launch checklist tracking.
+- Added client/project workspaces so members can separate saved targets, notes, and reports by client or campaign.
+- Added member team seat management with owner, analyst, billing, reviewer, and read-only roles.
+- Added bulk search queueing for CSV-style target input with consent confirmation.
+- Added report template cards and a PDF-ready report export option in the member reports area.
 ## 0.1.9 - 2026-07-13
 
 - Replaced the public platform-controls block with sales-focused value copy.

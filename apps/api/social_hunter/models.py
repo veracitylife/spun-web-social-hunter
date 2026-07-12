@@ -385,6 +385,73 @@ class MemberDashboardSummary(BaseModel):
     plan_features: list[str] = Field(default_factory=list)
 
 
+
+class OnboardingProfile(BaseModel):
+    organization: str = ""
+    approved_use_case: str = "authorized_business_research"
+    default_geography: str = "United States"
+    primary_sources: list[str] = Field(default_factory=lambda: ["username_profile", "email_intel", "domain_intel"])
+    first_search_target: str = ""
+    completed_steps: list[str] = Field(default_factory=list)
+
+
+class ProjectWorkspace(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    tenant_id: str = "default-tenant"
+    name: str = Field(min_length=2, max_length=120)
+    client_name: str = Field(default="", max_length=120)
+    use_case: str = Field(default="authorized_business_research", max_length=120)
+    status: Literal["active", "paused", "archived"] = "active"
+    saved_targets: list[str] = Field(default_factory=list)
+    notes: str = Field(default="", max_length=1000)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectWorkspaceCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    client_name: str = Field(default="", max_length=120)
+    use_case: str = Field(default="authorized_business_research", max_length=120)
+    saved_targets: list[str] = Field(default_factory=list)
+    notes: str = Field(default="", max_length=1000)
+
+
+class TeamSeat(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    tenant_id: str = "default-tenant"
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=3, max_length=255)
+    role: Literal["owner", "analyst", "billing", "reviewer", "readonly"] = "analyst"
+    status: Literal["active", "invited", "disabled"] = "invited"
+    invited_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class BulkSearchItem(BaseModel):
+    target_type: TargetType
+    target: str = Field(min_length=2, max_length=255)
+    project_id: UUID | None = None
+
+
+class BulkSearchRequest(BaseModel):
+    items: list[BulkSearchItem] = Field(default_factory=list, max_length=250)
+    consent_confirmed: bool = False
+    dry_run: bool = True
+
+
+class BulkSearchResponse(BaseModel):
+    accepted: int
+    rejected: int
+    jobs: list[SearchJob] = Field(default_factory=list)
+    message: str
+
+
+class ReportTemplate(BaseModel):
+    id: str
+    name: str
+    format: Literal["pdf_ready_html", "markdown", "csv", "json"] = "pdf_ready_html"
+    sections: list[str] = Field(default_factory=list)
+    brand_name: str = "Social Hunter"
+    include_source_attribution: bool = True
+    include_consent_record: bool = True
 class MailSettings(BaseModel):
     provider: str = "smtp_or_api"
     from_email: str = "support@spunwebtechnology.com"

@@ -18,6 +18,8 @@ from social_hunter.models import (
     ApiKeyTestRequest,
     DeploymentHardeningStatus,
     AuthResponse,
+    BulkSearchRequest,
+    BulkSearchResponse,
     ContactSubmission,
     ContactSubmissionRecord,
     ComplianceSettings,
@@ -54,6 +56,11 @@ from social_hunter.models import (
     UserAccountView,
     MailSettings,
     MemberDashboardSummary,
+    OnboardingProfile,
+    ProjectWorkspace,
+    ProjectWorkspaceCreate,
+    ReportTemplate,
+    TeamSeat,
     WhatsMyNameImportRequest,
     WhatsMyNameImportResponse,
 )
@@ -147,6 +154,37 @@ paypal_settings = PayPalSettings(**state.get("paypal_settings", PayPalSettings()
 hardening_status = DeploymentHardeningStatus(**state.get("hardening_status", DeploymentHardeningStatus().model_dump(mode="json")))
 compliance_settings = ComplianceSettings(**state.get("compliance_settings", ComplianceSettings().model_dump(mode="json")))
 usage_controls = UsageControlSettings(**state.get("usage_controls", UsageControlSettings().model_dump(mode="json")))
+onboarding_profiles: dict[str, dict] = state.get("onboarding_profiles", {})
+project_workspaces: list[ProjectWorkspace] = _load_list(
+    "project_workspaces",
+    [
+        ProjectWorkspace(
+            tenant_id="default-tenant",
+            name="First client workspace",
+            client_name="Sample Client",
+            use_case="authorized_business_research",
+            saved_targets=["clientcompany.com", "sample-user"],
+            notes="Use this workspace to group searches, reports, and saved targets by client.",
+        )
+    ],
+    ProjectWorkspace,
+)
+team_seats: list[TeamSeat] = _load_list(
+    "team_seats",
+    [
+        TeamSeat(tenant_id="default-tenant", name="Account Owner", email="owner@example.com", role="owner", status="active"),
+        TeamSeat(tenant_id="default-tenant", name="Research Analyst", email="analyst@example.com", role="analyst", status="invited"),
+    ],
+    TeamSeat,
+)
+report_templates: list[ReportTemplate] = _load_list(
+    "report_templates",
+    [
+        ReportTemplate(id="client-ready", name="Client-ready PDF package", sections=["summary", "findings", "source_attribution", "consent_record", "next_steps"]),
+        ReportTemplate(id="internal-review", name="Internal review brief", format="markdown", sections=["summary", "risk_flags", "open_questions"]),
+    ],
+    ReportTemplate,
+)
 
 app = FastAPI(
     title="Social Hunter API",
@@ -233,6 +271,74 @@ async def member_dashboard(session = Depends(require_member)) -> MemberDashboard
         plan_features=plan.services,
     )
 
+
+@app.get("/api/member/onboarding", response_model=OnboardingProfile)
+async def get_member_onboarding(session = Depends(require_member)) -> OnboardingProfile:
+    stored = onboarding_profiles.get(session.username)
+    if stored:
+        return OnboardingProfile(**stored)
+    user = _member_account(session.username)
+    tenant = _tenant_for_member(user)
+    return OnboardingProfile(organization=tenant.name, first_search_target="")
+
+
+@app.put("/api/member/onboarding", response_model=OnboardingProfile)
+async def update_member_onboarding(request: OnboardingProfile, session = Depends(require_member)) -> OnboardingProfile:
+    onboarding_profiles[session.username] = request.model_dump(mode="json")
+    _save_state("onboarding_profiles", onboarding_profiles)
+    _append_audit({"actor": session.username, "action": "onboarding_updated", "status": "saved", "steps": str(len(request.completed_steps))})
+    return request
+
+
+@app.get("/api/member/projects", response_model=list[ProjectWorkspace])
+async def get_member_projects(session = Depends(require_member)) -> list[ProjectWorkspace]:
+    user = _member_account(session.username)
+    return [project for project in project_workspaces if project.tenant_id == user.tenant_id]
+
+
+@app.post("/api/member/projects", response_model=ProjectWorkspace)
+async def create_member_project(request: ProjectWorkspaceCreate, session = Depends(require_member)) -> ProjectWorkspace:
+    user = _member_account(session.username)
+    project = ProjectWorkspace(tenant_id=user.tenant_id, **request.model_dump())
+    project_workspaces.append(project)
+    _save_state("project_workspaces", project_workspaces)
+    _append_audit({"actor": session.username, "action": "project_workspace_created", "status": "saved", "project_id": str(project.id)})
+    return project
+
+
+@app.get("/api/member/team-seats", response_model=list[TeamSeat])
+async def get_member_team_seats(session = Depends(require_member)) -> list[TeamSeat]:
+    user = _member_account(session.username)
+    return [seat for seat in team_seats if seat.tenant_id == user.tenant_id]
+
+
+@app.put("/api/member/team-seats", response_model=list[TeamSeat])
+async def update_member_team_seats(request: list[TeamSeat], session = Depends(require_member)) -> list[TeamSeat]:
+    global team_seats
+    user = _member_account(session.username)
+    scoped = [TeamSeat(**{**seat.model_dump(), "tenant_id": user.tenant_id}) for seat in request]
+    team_seats = [seat for seat in team_seats if seat.tenant_id != user.tenant_id] + scoped
+    _save_state("team_seats", team_seats)
+    _append_audit({"actor": session.username, "action": "team_seats_updated", "status": "saved", "count": str(len(scoped))})
+    return scoped
+
+
+@app.get("/api/member/report-templates", response_model=list[ReportTemplate])
+async def get_member_report_templates(session = Depends(require_member)) -> list[ReportTemplate]:
+    _member_account(session.username)
+    return report_templates
+
+
+@app.post("/api/member/bulk-search", response_model=BulkSearchResponse)
+async def member_bulk_search(request: BulkSearchRequest, session = Depends(require_member)) -> BulkSearchResponse:
+    if not request.consent_confirmed:
+        raise HTTPException(status_code=400, detail="consent_confirmed is required for bulk searches")
+    jobs: list[SearchJob] = []
+    for item in request.items:
+        job = await create_job(SearchRequest(target_type=item.target_type, target=item.target, consent_confirmed=True, dry_run=request.dry_run))
+        jobs.append(job)
+    _append_audit({"actor": session.username, "action": "bulk_search_queued", "status": "queued", "accepted": str(len(jobs))})
+    return BulkSearchResponse(accepted=len(jobs), rejected=0, jobs=jobs, message="Bulk search items queued. Track progress from the reports page.")
 
 @app.post("/api/member/billing/checkout", response_model=PayPalCheckoutResponse)
 async def member_billing_checkout(request: PayPalCheckoutRequest, session = Depends(require_member)) -> PayPalCheckoutResponse:
