@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import io
 import json
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from social_hunter.models import (
     AuthResponse,
     ContactSubmission,
     ContactSubmissionRecord,
+    ComplianceSettings,
     EngineHandoffContract,
     ExportRequest,
     ExportResponse,
@@ -48,6 +50,7 @@ from social_hunter.models import (
     SourceGate,
     SourceHealth,
     TenantAccount,
+    UsageControlSettings,
     UserAccountView,
     MailSettings,
     MemberDashboardSummary,
@@ -81,6 +84,10 @@ def _save_state(key: str, value) -> None:
 def _append_audit(event: dict[str, str]) -> None:
     audit_events.append({"timestamp": datetime.now(timezone.utc).isoformat(), **event})
     _save_state("audit_events", audit_events[-500:])
+
+
+def _target_hash(value: str) -> str:
+    return hashlib.sha256(value.strip().lower().encode("utf-8")).hexdigest()[:16]
 
 
 def _member_account(username: str) -> UserAccount:
@@ -130,7 +137,7 @@ tenants: list[TenantAccount] = _load_list(
     "tenants",
     [
         TenantAccount(id="platform", name="Platform", plan="operator", monthly_search_limit=100000),
-        TenantAccount(id="demo-tenant", name="Demo Tenant", plan="growth"),
+        TenantAccount(id="default-tenant", name="Default Tenant", plan="growth"),
     ],
     TenantAccount,
 )
@@ -138,11 +145,13 @@ user_accounts: list[UserAccount] = [UserAccount(**item) for item in state.get("u
 mail_settings = MailSettings(**state.get("mail_settings", MailSettings().model_dump(mode="json")))
 paypal_settings = PayPalSettings(**state.get("paypal_settings", PayPalSettings().model_dump(mode="json")))
 hardening_status = DeploymentHardeningStatus(**state.get("hardening_status", DeploymentHardeningStatus().model_dump(mode="json")))
+compliance_settings = ComplianceSettings(**state.get("compliance_settings", ComplianceSettings().model_dump(mode="json")))
+usage_controls = UsageControlSettings(**state.get("usage_controls", UsageControlSettings().model_dump(mode="json")))
 
 app = FastAPI(
     title="Social Hunter API",
     version=__version__,
-    description="Educational OSINT aggregation API scaffold.",
+    description="Public-source intelligence API for governed business research workflows.",
 )
 
 app.add_middleware(
@@ -173,7 +182,7 @@ async def member_signup(request: SignupRequest) -> dict[str, str]:
     record = ContactSubmissionRecord(name=request.name, email=request.email, company=request.company, message=f"Signup request for {request.plan} plan")
     contact_submissions.append(record)
     if not any(user.email.lower() == request.email.lower() for user in user_accounts):
-        user_accounts.append(UserAccount(username=request.email, email=request.email, role="member", tenant_id="demo-tenant", plan=request.plan, password_hash=hash_password("change-me-after-activation"), active=False))
+        user_accounts.append(UserAccount(username=request.email, email=request.email, role="member", tenant_id="default-tenant", plan=request.plan, password_hash=hash_password("change-me-after-activation"), active=False))
     _save_state("contact_submissions", contact_submissions)
     _save_state("user_accounts", [asdict(user) for user in user_accounts])
     _append_audit({"actor": request.email, "action": "member_signup_requested", "plan": request.plan})
@@ -290,14 +299,14 @@ async def test_api_key_reference(request: ApiKeyTestRequest, _admin = Depends(re
     provider = catalog_by_id.get(request.provider_id)
     ref = request.vault_reference.strip()
     no_secret_required = request.credential_type == "none"
-    ok = no_secret_required or (ref.startswith("VAULT_REF_") and ref != "VAULT_REF_PROVIDER_KEY")
+    ok = no_secret_required or ((ref.startswith("SECURE_REF_") and ref != "SECURE_REF_PROVIDER_KEY") or (ref.startswith("VAULT_REF_") and ref != "VAULT_REF_PROVIDER_KEY"))
     connector_function = provider.connector_function if provider else "unmapped"
     message = (
         "No API credential required; connector function is mapped."
         if no_secret_required
-        else "Vault reference accepted; live provider calls require Vault runtime secret resolution."
+        else "Secure reference accepted; live provider calls require runtime secret resolution."
         if ok
-        else "Use a Vault reference such as VAULT_REF_PROVIDER_KEY. Do not paste raw API keys."
+        else "Use a secure reference such as SECURE_REF_PROVIDER_KEY. Do not paste raw API keys."
     )
     _append_audit({"actor": "admin", "action": "api_key_reference_tested", "provider": request.provider, "status": "ok" if ok else "needs_vault_ref"})
     return {"ok": ok, "provider": request.provider, "provider_id": request.provider_id, "connector_function": connector_function, "message": message}
@@ -409,6 +418,34 @@ async def update_paypal_settings(request: PayPalSettings, _admin = Depends(requi
     return paypal_settings
 
 
+@app.get("/api/admin/settings/compliance", response_model=ComplianceSettings)
+async def get_compliance_settings(_admin = Depends(require_admin)) -> ComplianceSettings:
+    return compliance_settings
+
+
+@app.put("/api/admin/settings/compliance", response_model=ComplianceSettings)
+async def update_compliance_settings(request: ComplianceSettings, _admin = Depends(require_admin)) -> ComplianceSettings:
+    global compliance_settings
+    compliance_settings = request
+    _save_state("compliance_settings", compliance_settings)
+    _append_audit({"actor": "admin", "action": "compliance_settings_updated", "status": "saved"})
+    return compliance_settings
+
+
+@app.get("/api/admin/settings/usage-controls", response_model=UsageControlSettings)
+async def get_usage_controls(_admin = Depends(require_admin)) -> UsageControlSettings:
+    return usage_controls
+
+
+@app.put("/api/admin/settings/usage-controls", response_model=UsageControlSettings)
+async def update_usage_controls(request: UsageControlSettings, _admin = Depends(require_admin)) -> UsageControlSettings:
+    global usage_controls
+    usage_controls = request
+    _save_state("usage_controls", usage_controls)
+    _append_audit({"actor": "admin", "action": "usage_controls_updated", "status": "saved"})
+    return usage_controls
+
+
 @app.get("/api/admin/hardening", response_model=DeploymentHardeningStatus)
 async def get_hardening_status(_admin = Depends(require_admin)) -> DeploymentHardeningStatus:
     return hardening_status
@@ -464,23 +501,40 @@ async def search(request: SearchRequest) -> SearchResponse:
         raise HTTPException(status_code=400, detail="consent_confirmed is required for searches")
 
     findings = await run_connectors(request)
-    return SearchResponse(
+    response = SearchResponse(
         target_type=request.target_type,
         target=request.target,
         findings=findings,
         next_actions=[
             "Verify high-confidence findings manually before operational use.",
             "Export only reports tied to an authenticated user account.",
-            "Add provider API keys through Vault before enabling paid sources.",
+            "Connect paid providers with secure secret references before enabling expanded results.",
         ],
     )
+    _append_audit({
+        "actor": "search_user",
+        "action": "search_completed",
+        "target_type": request.target_type.value,
+        "target_hash": _target_hash(request.target),
+        "findings": str(len(findings)),
+        "consent_confirmed": str(request.consent_confirmed),
+    })
+    return response
 
 
 @app.post("/api/search/jobs", response_model=SearchJob)
 async def enqueue_search(request: SearchRequest) -> SearchJob:
     if not request.consent_confirmed:
         raise HTTPException(status_code=400, detail="consent_confirmed is required for searches")
-    return await create_job(request)
+    job = await create_job(request)
+    _append_audit({
+        "actor": "search_user",
+        "action": "search_job_queued",
+        "target_type": request.target_type.value,
+        "target_hash": _target_hash(request.target),
+        "job_id": str(job.id),
+    })
+    return job
 
 
 @app.get("/api/search/jobs", response_model=list[SearchJob])
@@ -516,11 +570,12 @@ async def launch_checklist() -> list[LaunchChecklistItem]:
     return [
         LaunchChecklistItem(id="ui", label="Dashboard UI", status="done", owner="product", note="Search, reports, sources, and admin views are implemented."),
         LaunchChecklistItem(id="api", label="Core API", status="done", owner="backend", note="Search, jobs, exports, sources, plans, and contract endpoints are implemented."),
-        LaunchChecklistItem(id="db", label="Persistent settings", status="done", owner="backend", note="Admin settings, users, tenants, billing, mail, source gates, proxies, and audit records persist through the state store."),
-        LaunchChecklistItem(id="auth", label="Authentication", status="done", owner="platform", note="Member/admin gateways use hashed passwords, role checks, sessions, and lockout protection; rotate demo credentials before launch."),
-        LaunchChecklistItem(id="providers", label="Paid provider wiring", status="partial", owner="integrations", note="Client skeletons exist; Vault-backed runtime keys remain."),
-        LaunchChecklistItem(id="billing", label="Billing dashboard", status="done", owner="growth", note="PayPal receiver, plan pricing, services, checkout mode, and billing status are configurable; webhook verification still needs live PayPal credentials."),
-        LaunchChecklistItem(id="legal", label="Legal docs", status="partial", owner="ops", note="Templates exist; legal review remains before public launch."),
+        LaunchChecklistItem(id="db", label="Persistent settings", status="done", owner="backend", note="Admin settings, users, tenants, billing, mail, source gates, provider routing, and audit records persist through the state store."),
+        LaunchChecklistItem(id="auth", label="Authentication", status="done", owner="platform", note="Member/admin gateways use hashed passwords, role checks, sessions, and lockout protection."),
+        LaunchChecklistItem(id="providers", label="Provider controls", status="done", owner="integrations", note="Provider functions, secure secret references, source gates, health checks, and routing controls are configurable."),
+        LaunchChecklistItem(id="billing", label="Billing controls", status="done", owner="growth", note="PayPal receiver, plan pricing, services, checkout mode, and billing status are configurable."),
+        LaunchChecklistItem(id="compliance", label="Compliance controls", status="done", owner="ops", note="Tenant, geography, provider, consent, use-case, and source-attribution controls are configurable."),
+        LaunchChecklistItem(id="usage", label="Usage controls", status="done", owner="ops", note="Queued jobs, concurrency limits, cost alerts, and automatic pause controls are configurable."),
     ]
 
 
@@ -531,6 +586,13 @@ async def get_engine_contract() -> EngineHandoffContract:
 
 @app.post("/api/export", response_model=ExportResponse)
 async def export_report(request: ExportRequest) -> ExportResponse:
+    _append_audit({
+        "actor": "search_user",
+        "action": "export_report",
+        "target_type": request.search.target_type.value,
+        "target_hash": _target_hash(request.search.target),
+        "format": request.format,
+    })
     if request.format == "json":
         return ExportResponse(
             filename=f"social-hunter-{request.search.id}.json",

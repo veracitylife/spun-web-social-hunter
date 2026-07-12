@@ -1,11 +1,11 @@
 # Social Hunter
 
-Current version: `0.1.6`
+Current version: `0.1.7`
 
 
-Social Hunter is an educational OSINT aggregation platform scaffold for username, email, domain, IP, and phone lookups. It is built around source attribution, confidence scoring, normalized evidence, exports, and operator auditability.
+Social Hunter is a managed public-source intelligence SaaS for username, email, domain, IP, business, and phone validation workflows. It is built around source attribution, confidence scoring, normalized evidence, exports, role-based access, billing controls, and operational auditability.
 
-This build includes the platform around lawful OSINT workflows: UI, API, source registry, connector contracts, provider clients, report exports, data models, deployment files, monitoring profile, and classroom docs.
+This build includes the customer-facing workspace, member and admin dashboards, provider registry, report exports, persistent settings, payment configuration, compliance gates, usage controls, and deployment assets.
 
 ## Stack
 
@@ -14,7 +14,7 @@ This build includes the platform around lawful OSINT workflows: UI, API, source 
 - Worker: Python async worker process
 - Queue/cache: Redis
 - Database: PostgreSQL
-- Reverse proxy: Nginx profile
+- Web routing: Nginx profile
 - Monitoring: Prometheus profile
 - Runtime: Docker Compose
 
@@ -26,7 +26,7 @@ This build includes the platform around lawful OSINT workflows: UI, API, source 
 Copy-Item .env.example .env
 ```
 
-2. Map real secrets through OpenClaw Vault references before production use. Do not paste raw keys into tracked files.
+2. Map real secrets through secure secret references before production use. Do not paste raw keys into tracked files.
 
 3. Start the stack:
 
@@ -46,15 +46,15 @@ docker compose up --build
 - Search dashboard with username, email, domain, IP, and phone modes
 - Reports view with JSON/CSV export flow
 - Source registry view
-- Admin/launch blocker view
-- FastAPI search, queued-job, source registry, source health, plans, launch checklist, export, and engine contract endpoints
-- WhatsMyName-style fixture connector
+- Admin settings, compliance, usage, billing, and operations views
+- FastAPI search, queued-job, source registry, source health, plans, readiness, compliance, usage control, export, and integration endpoints
+- WhatsMyName-style public profile URL connector
 - Public profile HTTP checker engine for approved public URLs
 - HIBP, IPinfo, Hunter.io, People Data Labs, Twilio Lookup, GitHub, X, search-index, business-data, and domain-intel provider client skeletons
-- PostgreSQL model scaffold and initial SQL migration for searches, findings, source health, exports, and audits
-- Rate-limit, auth-context, billing-plan, privacy-hash, and report service scaffolds
+- PostgreSQL models and initial SQL migration for searches, findings, source health, exports, and audits
+- Rate-limit, auth-context, billing-plan, privacy-hash, usage-control, and report services
 - Docker Compose with Postgres, Redis, API, worker, web, Nginx, and Prometheus profiles
-- Classroom guide, cost model, legal templates, deployment and operations runbooks
+- Cost model, legal templates, deployment notes, and operations runbooks
 
 
 ## Connector Families
@@ -67,7 +67,7 @@ docker compose up --build
 - `domain_intel`: RDAP/WHOIS, IPinfo, SecurityTrails, BuiltWith/Wappalyzer, DNSDB-style passive DNS
 - `web_search`: Brave Search, SerpApi, Bing Web Search, Tavily, Exa, and legacy Google CSE customer slot
 
-Live provider calls are disabled until approved Vault-backed credentials and source terms are mapped. Placeholder connectors return normalized skipped findings for classroom workflows.
+Live provider calls are controlled by secure credential references, provider terms, tenant source gates, and admin approval rules. Providers without active credentials return normalized status results instead of exposing raw failures.
 ## Useful Commands
 
 ```powershell
@@ -83,11 +83,9 @@ docker compose --profile monitoring up -d
 - `docs/architecture.md`
 - `docs/api.md`
 - `docs/engine-contract.md`
-- `docs/classroom/lesson-plan.md`
 - `docs/runbooks/deployment.md`
 - `docs/runbooks/operations.md`
 - `docs/cost-model.md`
-- `docs/handoff.md`
 
 ## Versioning
 

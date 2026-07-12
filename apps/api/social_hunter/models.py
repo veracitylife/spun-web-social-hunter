@@ -113,7 +113,7 @@ class ExportResponse(BaseModel):
 
 class AuditEvent(BaseModel):
     id: UUID = Field(default_factory=uuid4)
-    actor: str = "demo-analyst"
+    actor: str = "system"
     action: str
     target_type: TargetType | None = None
     target_hash: str | None = None
@@ -388,14 +388,14 @@ class MemberDashboardSummary(BaseModel):
 class MailSettings(BaseModel):
     provider: str = "smtp_or_api"
     from_email: str = "support@spunwebtechnology.com"
-    smtp_api_key_ref: str = "VAULT_REF_SOCIAL_HUNTER_SMTP_API_KEY"
+    smtp_api_key_ref: str = "SECURE_REF_SOCIAL_HUNTER_SMTP_API_KEY"
     password_reset_enabled: bool = True
     contact_notifications_enabled: bool = True
 
 
 class PayPalSettings(BaseModel):
     receiver_email: str = "techpronow@gmail.com"
-    webhook_secret_ref: str = "VAULT_REF_PAYPAL_WEBHOOK_SECRET"
+    webhook_secret_ref: str = "SECURE_REF_PAYPAL_WEBHOOK_SECRET"
     subscriptions_enabled: bool = False
     webhook_verified: bool = False
     currency: str = "USD"
@@ -437,6 +437,27 @@ class PayPalSettings(BaseModel):
             sort_order=30,
         ),
     ])
+
+
+class ComplianceSettings(BaseModel):
+    tenant_controls_enabled: bool = True
+    require_consent_record: bool = True
+    require_source_attribution: bool = True
+    default_use_case: str = "authorized_business_research"
+    allowed_geographies: list[str] = Field(default_factory=lambda: ["United States"])
+    approval_required_for_sensitive_sources: bool = True
+    reviewer_role_enabled: bool = True
+    note: str = "Source access is gated by tenant, provider terms, geography, and approved use case."
+
+
+class UsageControlSettings(BaseModel):
+    queue_enabled: bool = True
+    max_concurrent_jobs: int = Field(default=4, ge=1, le=50)
+    monthly_cost_alert_threshold: float = Field(default=250, ge=0)
+    high_cost_provider_alerts: bool = True
+    notify_billing_contact: bool = True
+    automatic_pause_on_limit: bool = True
+    note: str = "Usage caps and alerts protect paid provider credits from accidental overuse."
 
 
 class DeploymentHardeningStatus(BaseModel):

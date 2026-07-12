@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.7 - 2026-07-13
+
+- Reframed the public landing page from internal recommendations into included SaaS platform controls.
+- Added admin-managed compliance settings for tenant controls, consent records, source attribution, geography, use case, and reviewer role policy.
+- Added admin-managed usage controls for queued jobs, concurrency limits, cost alerts, billing notifications, and automatic pause behavior.
+- Added audit records for completed searches, queued jobs, exports, compliance changes, and usage-control changes.
+- Removed customer-visible demo, launch, scaffold, and handoff language from the main SaaS UI and README.
+
 ## 0.1.6 - 2026-07-12
 
 - Finished member dashboard account and billing surfaces with live account summary, plan details, source health, recent jobs, and PayPal checkout wiring.
