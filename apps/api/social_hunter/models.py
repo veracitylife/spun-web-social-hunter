@@ -149,3 +149,90 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
     service: str
     version: str
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=2, max_length=255)
+    password: str = Field(min_length=1, max_length=255)
+
+
+class AuthResponse(BaseModel):
+    ok: bool
+    role: Literal["member", "admin"]
+    display_name: str
+    token: str
+    message: str
+
+
+class PasswordResetRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+
+
+class SignupRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=255)
+    email: str = Field(min_length=3, max_length=255)
+    company: str = Field(default="", max_length=255)
+    plan: str = Field(default="growth", max_length=50)
+
+
+class ContactSubmission(BaseModel):
+    name: str = Field(min_length=2, max_length=255)
+    email: str = Field(min_length=3, max_length=255)
+    company: str = Field(default="", max_length=255)
+    message: str = Field(min_length=3, max_length=2000)
+
+
+class ContactSubmissionRecord(ContactSubmission):
+    id: UUID = Field(default_factory=uuid4)
+    status: Literal["new", "reviewed", "replied"] = "new"
+    received_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class GeneralSettings(BaseModel):
+    application_name: str = "Social Hunter"
+    public_url: str = "https://social-hunter.spunwebtechnology.com/"
+    support_email: str = "techpronow@gmail.com"
+    default_plan: str = "growth"
+    require_consent: bool = True
+    normalized_evidence_only: bool = True
+    high_cost_provider_approval: bool = True
+    export_retention_days: int = 90
+
+
+class ApiKeyReference(BaseModel):
+    provider: str
+    vault_reference: str = Field(default="", max_length=255)
+    enabled: bool = False
+
+
+class ApiKeyTestRequest(BaseModel):
+    provider: str
+    vault_reference: str = Field(default="", max_length=255)
+
+
+class ProxySettings(BaseModel):
+    mode: Literal["off", "provider", "manual"] = "off"
+    manual_entries: list[str] = Field(default_factory=list)
+    use_only_for_allowlisted_egress: bool = True
+    disable_failed_proxies: bool = True
+    require_admin_approval: bool = False
+    health_check_interval_minutes: int = 30
+
+
+class ProxyTestResponse(BaseModel):
+    ok: bool
+    tested: int
+    valid_format: int
+    message: str
+
+
+class PayPalCheckoutRequest(BaseModel):
+    plan: str
+    email: str | None = None
+
+
+class PayPalCheckoutResponse(BaseModel):
+    plan: str
+    paypal_email: str
+    checkout_url: str
+    message: str
