@@ -129,12 +129,25 @@ class EngineHandoffContract(BaseModel):
     integration_notes: list[str]
 
 
-class PlanResponse(BaseModel):
-    id: str
-    name: str
-    monthly_search_limit: int
-    export_enabled: bool
-    api_access_enabled: bool
+class BillingPlan(BaseModel):
+    id: str = Field(min_length=2, max_length=50)
+    name: str = Field(min_length=2, max_length=80)
+    amount: float = Field(default=49, ge=0)
+    currency: str = Field(default="USD", min_length=3, max_length=3)
+    interval: Literal["month", "year", "one_time"] = "month"
+    monthly_search_limit: int = Field(default=250, ge=0)
+    export_enabled: bool = True
+    api_access_enabled: bool = False
+    description: str = Field(default="", max_length=500)
+    services: list[str] = Field(default_factory=list)
+    enabled: bool = True
+    public: bool = True
+    paypal_item_name: str = Field(default="", max_length=120)
+    sort_order: int = 0
+
+
+class PlanResponse(BillingPlan):
+    pass
 
 
 class LaunchChecklistItem(BaseModel):
@@ -273,6 +286,34 @@ class ProxyTestResponse(BaseModel):
     message: str
 
 
+class ProxyConnectionTestRequest(BaseModel):
+    entries: list[str] = Field(default_factory=list, max_length=200)
+    target_url: str = Field(default="https://api.ipify.org?format=json", max_length=500)
+    timeout_seconds: float = Field(default=8, ge=1, le=30)
+    concurrency: int = Field(default=4, ge=1, le=10)
+
+
+class ProxyConnectionResult(BaseModel):
+    index: int
+    proxy: str
+    ok: bool
+    status: Literal["connected", "failed", "invalid_format", "skipped"]
+    latency_ms: float | None = None
+    http_status: int | None = None
+    error: str = ""
+    target_url: str
+
+
+class ProxyConnectionTestResponse(BaseModel):
+    ok: bool
+    tested: int
+    connected: int
+    failed: int
+    target_url: str
+    results: list[ProxyConnectionResult] = Field(default_factory=list)
+    message: str
+
+
 class PayPalCheckoutRequest(BaseModel):
     plan: str
     email: str | None = None
@@ -283,3 +324,113 @@ class PayPalCheckoutResponse(BaseModel):
     paypal_email: str
     checkout_url: str
     message: str
+
+
+class ProviderRuntimeTestRequest(BaseModel):
+    provider_id: str
+    sample_target: str = "socialhunter"
+
+
+class ProviderRuntimeTestResponse(BaseModel):
+    provider_id: str
+    ok: bool
+    status: Literal["ready", "needs_key", "error", "skipped"]
+    message: str
+    latency_ms: float | None = None
+    finding_count: int = 0
+
+
+class WhatsMyNameImportRequest(BaseModel):
+    dry_run: bool = True
+    limit: int | None = Field(default=250, ge=1, le=10000)
+
+
+class WhatsMyNameImportResponse(BaseModel):
+    loaded: int = 0
+    importable: int = 0
+    dry_run: bool = True
+    stored_total: int | None = None
+    updated_at: str | None = None
+
+
+class TenantAccount(BaseModel):
+    id: str
+    name: str
+    plan: str = "growth"
+    monthly_search_limit: int = 1500
+    status: Literal["active", "pending", "suspended"] = "active"
+
+
+class UserAccountView(BaseModel):
+    username: str
+    email: str
+    role: Literal["admin", "member", "analyst", "billing", "viewer"]
+    tenant_id: str
+    plan: str
+    active: bool = True
+    failed_attempts: int = 0
+    locked_until: str | None = None
+
+
+class MailSettings(BaseModel):
+    provider: str = "smtp_or_api"
+    from_email: str = "support@spunwebtechnology.com"
+    smtp_api_key_ref: str = "VAULT_REF_SOCIAL_HUNTER_SMTP_API_KEY"
+    password_reset_enabled: bool = True
+    contact_notifications_enabled: bool = True
+
+
+class PayPalSettings(BaseModel):
+    receiver_email: str = "techpronow@gmail.com"
+    webhook_secret_ref: str = "VAULT_REF_PAYPAL_WEBHOOK_SECRET"
+    subscriptions_enabled: bool = False
+    webhook_verified: bool = False
+    currency: str = "USD"
+    checkout_mode: Literal["paypal_button", "subscription", "manual_invoice"] = "paypal_button"
+    billing_contact_email: str = "techpronow@gmail.com"
+    terms_url: str = "https://social-hunter.spunwebtechnology.com/#pricing"
+    success_url: str = "https://social-hunter.spunwebtechnology.com/members/"
+    cancel_url: str = "https://social-hunter.spunwebtechnology.com/#pricing"
+    plans: list[BillingPlan] = Field(default_factory=lambda: [
+        BillingPlan(
+            id="starter",
+            name="Starter",
+            amount=49,
+            monthly_search_limit=250,
+            description="Entry plan for small public-source research workflows.",
+            services=["250 searches per month", "Dashboard access", "JSON and CSV exports", "Public profile source gates"],
+            paypal_item_name="Social Hunter Starter Plan",
+            sort_order=10,
+        ),
+        BillingPlan(
+            id="growth",
+            name="Growth",
+            amount=149,
+            monthly_search_limit=1500,
+            description="Team plan for recurring account, domain, and contact verification workflows.",
+            services=["1,500 searches per month", "Member dashboard", "Report exports", "Provider health checks", "Source gate controls"],
+            paypal_item_name="Social Hunter Growth Plan",
+            sort_order=20,
+        ),
+        BillingPlan(
+            id="operator",
+            name="Operator",
+            amount=399,
+            monthly_search_limit=7500,
+            api_access_enabled=True,
+            description="Operator plan for higher-volume teams that need API access and advanced provider configuration.",
+            services=["7,500 searches per month", "API access", "Advanced source controls", "Proxy route configuration", "Audit and compliance exports"],
+            paypal_item_name="Social Hunter Operator Plan",
+            sort_order=30,
+        ),
+    ])
+
+
+class DeploymentHardeningStatus(BaseModel):
+    https_only_cookies: bool = True
+    csrf_required_for_admin: bool = True
+    cors_locked_down: bool = True
+    vault_only_secrets: bool = True
+    container_health_checks: bool = True
+    automated_backups: bool = False
+    note: str = "Core hardening flags are configured; backup automation still requires host-level scheduling."

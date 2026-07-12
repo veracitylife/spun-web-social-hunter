@@ -15,6 +15,73 @@ class Base(DeclarativeBase):
     pass
 
 
+
+
+class TenantRecord(Base):
+    __tablename__ = "tenant_records"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    plan: Mapped[str] = mapped_column(String(50), nullable=False, default="growth")
+    monthly_search_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=1500)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
+    settings_json: Mapped[dict] = mapped_column("settings", JSONB, default=dict)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserAccountRecord(Base):
+    __tablename__ = "user_account_records"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    username: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
+    tenant_id: Mapped[str] = mapped_column(String(100), ForeignKey("tenant_records.id"), nullable=False, index=True)
+    plan: Mapped[str] = mapped_column(String(50), nullable=False, default="growth")
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AdminStateRecord(Base):
+    __tablename__ = "admin_state_records"
+
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    value_json: Mapped[dict | list] = mapped_column("value", JSONB, default=dict)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProviderUsageRecord(Base):
+    __tablename__ = "provider_usage_records"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    provider_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    latency_ms: Mapped[float | None] = mapped_column(Float)
+    cost_units: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+
+
+class BackgroundJobRecord(Base):
+    __tablename__ = "background_job_records"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    job_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="queued")
+    payload_json: Mapped[dict] = mapped_column("payload", JSONB, default=dict)
+    result_json: Mapped[dict | None] = mapped_column("result", JSONB)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
 class SearchRecord(Base):
     __tablename__ = "search_records"
 

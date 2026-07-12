@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.1.3 - 2026-07-12
+## 0.1.5 - 2026-07-12
+
+- Added an admin proxy connection tester that checks each imported proxy against a configurable public target URL.
+- Added per-proxy result reporting with redacted proxy display, status, latency, HTTP status, and safe error messages.
+- Added backend protections that block proxy tests against localhost, private, link-local, multicast, and reserved target hosts.
+
+## 0.1.4 - 2026-07-12
 
 - Added provider catalog mapping every source/API to its backend connector function and required Vault references.
 - Wired admin API-key, source-gate, proxy import, proxy validation, proxy route, contact mail, and audit pages to backend endpoints.

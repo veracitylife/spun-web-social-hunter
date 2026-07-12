@@ -1,4 +1,4 @@
-﻿from social_hunter.models import EngineHandoffContract, SourceCapability, TargetType
+from social_hunter.models import EngineHandoffContract, SourceCapability, TargetType
 
 SOURCE_CAPABILITIES = [
     SourceCapability(
@@ -15,8 +15,8 @@ SOURCE_CAPABILITIES = [
         name="GitHub REST Users API",
         category="username_profile",
         target_types=[TargetType.username],
-        status="needs_api_key",
-        terms_note="Use public user profile endpoints and provider tokens only where allowed by GitHub terms.",
+        status="ready",
+        terms_note="Use public user profile endpoints; a token is optional for higher GitHub API limits.",
         data_returned=["profile_url", "public_email", "company", "blog", "location", "public_repos"],
     ),
     SourceCapability(

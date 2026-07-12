@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     dnsdb_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
     fullcontact_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
     external_engine_api_key_ref: str = Field(default="REPLACE_WITH_VAULT_REFERENCE")
+    jwt_secret_ref: str = Field(default="VAULT_REF_SOCIAL_HUNTER_JWT_SECRET")
+    smtp_api_key_ref: str = Field(default="VAULT_REF_SOCIAL_HUNTER_SMTP_API_KEY")
+    paypal_webhook_secret_ref: str = Field(default="VAULT_REF_PAYPAL_WEBHOOK_SECRET")
+    state_file_path: str = Field(default="/tmp/social_hunter_state.json")
 
     @property
     def cors_origins(self) -> list[str]:

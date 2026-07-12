@@ -190,6 +190,40 @@ def provider_catalog() -> list[ProviderConfig]:
     return catalog
 
 
+
+
+def _default_vault_reference(credential_ref: str) -> str:
+    explicit = {
+        "BRAVE_SEARCH_API_KEY_REF": "BRAVE_SEARCH_API_KEY_",
+        "GITHUB_TOKEN_REF": "VAULT_REF_GITHUB_TOKEN",
+        "HIBP_API_KEY_REF": "VAULT_REF_HIBP_API_KEY",
+        "IPINFO_TOKEN_REF": "VAULT_REF_IPINFO_TOKEN",
+        "HUNTER_API_KEY_REF": "VAULT_REF_HUNTER_API_KEY",
+        "PEOPLE_DATA_LABS_API_KEY_REF": "VAULT_REF_PEOPLE_DATA_LABS_API_KEY",
+        "TWILIO_ACCOUNT_SID_REF": "VAULT_REF_TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN_REF": "VAULT_REF_TWILIO_AUTH_TOKEN",
+        "REDDIT_CLIENT_ID_REF": "VAULT_REF_REDDIT_CLIENT_ID",
+        "REDDIT_CLIENT_SECRET_REF": "VAULT_REF_REDDIT_CLIENT_SECRET",
+        "X_BEARER_TOKEN_REF": "VAULT_REF_X_BEARER_TOKEN",
+        "SERPAPI_API_KEY_REF": "VAULT_REF_SERPAPI_API_KEY",
+        "BING_SEARCH_API_KEY_REF": "VAULT_REF_BING_SEARCH_API_KEY",
+        "TAVILY_API_KEY_REF": "VAULT_REF_TAVILY_API_KEY",
+        "EXA_API_KEY_REF": "VAULT_REF_EXA_API_KEY",
+        "GOOGLE_PLACES_API_KEY_REF": "VAULT_REF_GOOGLE_PLACES_API_KEY",
+        "YELP_API_KEY_REF": "VAULT_REF_YELP_API_KEY",
+        "SECURITYTRAILS_API_KEY_REF": "VAULT_REF_SECURITYTRAILS_API_KEY",
+        "BUILTWITH_API_KEY_REF": "VAULT_REF_BUILTWITH_API_KEY",
+        "WAPPALYZER_API_KEY_REF": "VAULT_REF_WAPPALYZER_API_KEY",
+        "DNSDB_API_KEY_REF": "VAULT_REF_DNSDB_API_KEY",
+        "FULLCONTACT_API_KEY_REF": "VAULT_REF_FULLCONTACT_API_KEY",
+        "EXTERNAL_ENGINE_API_KEY_REF": "VAULT_REF_EXTERNAL_ENGINE_API_KEY",
+    }
+    return explicit.get(credential_ref, f"VAULT_REF_{credential_ref.removesuffix('_REF')}")
+
+
+def _default_enabled(provider_id: str, credential_ref: str) -> bool:
+    return provider_id in {"github-users", "web-search-indexes"} and credential_ref in {"GITHUB_TOKEN_REF", "BRAVE_SEARCH_API_KEY_REF"}
+
 def default_api_key_references() -> list[ApiKeyReference]:
     refs: list[ApiKeyReference] = []
     for provider in provider_catalog():
@@ -215,8 +249,8 @@ def default_api_key_references() -> list[ApiKeyReference]:
                     source_id=provider.source_id,
                     credential_type=credential_ref,
                     connector_function=provider.connector_function,
-                    vault_reference="REPLACE_WITH_VAULT_REFERENCE",
-                    enabled=False,
+                    vault_reference=_default_vault_reference(credential_ref),
+                    enabled=_default_enabled(provider.id, credential_ref),
                     notes=provider.note,
                 )
             )

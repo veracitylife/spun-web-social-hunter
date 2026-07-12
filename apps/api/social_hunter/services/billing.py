@@ -1,4 +1,4 @@
-﻿from urllib.parse import urlencode
+from urllib.parse import urlencode
 
 PAYPAL_EMAIL = "techpronow@gmail.com"
 
@@ -27,13 +27,15 @@ PLANS = {
 }
 
 
-def paypal_checkout_url(plan_id: str) -> str:
-    plan = PLANS[plan_id]
+def paypal_checkout_url(plan_id: str, *, receiver_email: str | None = None, amount: float | int | None = None, currency: str = "USD", item_name: str | None = None) -> str:
+    plan = PLANS.get(plan_id, {})
+    label = item_name or f"Social Hunter {plan.get('name', plan_id.title())} Plan"
+    price = amount if amount is not None else plan.get("amount", 0)
     params = {
         "cmd": "_xclick",
-        "business": PAYPAL_EMAIL,
-        "currency_code": "USD",
-        "item_name": f"Social Hunter {plan['name']} Plan",
-        "amount": str(plan["amount"]),
+        "business": receiver_email or PAYPAL_EMAIL,
+        "currency_code": currency,
+        "item_name": label,
+        "amount": str(price),
     }
     return "https://www.paypal.com/cgi-bin/webscr?" + urlencode(params)
