@@ -63,7 +63,7 @@ from social_hunter.services.provider_catalog import default_api_key_references, 
 from social_hunter.services.provider_runtime import test_provider_runtime
 from social_hunter.services.proxy_tester import test_proxy_connections
 from social_hunter.services.reports import render_markdown_report
-from social_hunter.services.security import UserAccount, default_users, hash_password, login_user, require_admin, require_session, serialize_user
+from social_hunter.services.security import UserAccount, default_users, hash_password, login_user, require_admin, require_member, require_session, serialize_user
 from social_hunter.services.state import PersistentState, dump_model
 from social_hunter.services.source_health import get_source_health
 from social_hunter.services.whatsmyname import fetch_whatsmyname, local_whatsmyname_status
@@ -171,6 +171,11 @@ async def member_login(request: LoginRequest) -> AuthResponse:
     return AuthResponse(ok=True, role="member", display_name=session.username, token=session.token, message="Member session issued.")
 
 
+@app.get("/api/auth/member/verify")
+async def member_verify(session = Depends(require_member)) -> dict[str, str | bool]:
+    return {"ok": True, "role": "member", "username": session.username}
+
+
 @app.post("/api/auth/member/password-reset")
 async def member_password_reset(request: PasswordResetRequest) -> dict[str, str]:
     _append_audit({"actor": request.email, "action": "password_reset_requested", "status": "queued"})
@@ -196,6 +201,11 @@ async def admin_login(request: LoginRequest) -> AuthResponse:
     _append_audit({"actor": session.username, "action": "admin_login", "status": "ok", "tenant_id": session.tenant_id})
     return AuthResponse(ok=True, role="admin", display_name=session.username, token=session.token, message="Admin session issued.")
 
+@app.get("/api/auth/admin/verify")
+async def admin_verify(session = Depends(require_admin)) -> dict[str, str | bool]:
+    return {"ok": True, "role": "admin", "username": session.username}
+
+
 @app.post("/api/auth/admin/password-reset")
 async def admin_password_reset(request: PasswordResetRequest) -> dict[str, str]:
     _append_audit({"actor": request.email, "action": "admin_password_reset_requested", "status": "queued"})
@@ -203,7 +213,7 @@ async def admin_password_reset(request: PasswordResetRequest) -> dict[str, str]:
 
 
 @app.get("/api/member/dashboard", response_model=MemberDashboardSummary)
-async def member_dashboard(session = Depends(require_session)) -> MemberDashboardSummary:
+async def member_dashboard(session = Depends(require_member)) -> MemberDashboardSummary:
     user = _member_account(session.username)
     tenant = _tenant_for_member(user)
     plan = _plan_for_member(user.plan)
@@ -225,7 +235,7 @@ async def member_dashboard(session = Depends(require_session)) -> MemberDashboar
 
 
 @app.post("/api/member/billing/checkout", response_model=PayPalCheckoutResponse)
-async def member_billing_checkout(request: PayPalCheckoutRequest, session = Depends(require_session)) -> PayPalCheckoutResponse:
+async def member_billing_checkout(request: PayPalCheckoutRequest, session = Depends(require_member)) -> PayPalCheckoutResponse:
     user = _member_account(session.username)
     selected_plan = request.plan or user.plan
     response = await paypal_checkout(PayPalCheckoutRequest(plan=selected_plan, email=user.email))

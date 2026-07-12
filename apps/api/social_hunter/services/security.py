@@ -65,7 +65,7 @@ def default_users() -> list[UserAccount]:
             username="member",
             email="member@example.com",
             role="member",
-            tenant_id="demo-tenant",
+            tenant_id="default-tenant",
             plan="growth",
             password_hash=hash_password("member", "socialhuntermembersalt"),
         ),
@@ -121,6 +121,13 @@ def require_session(authorization: str | None = Header(default=None)) -> Session
     if datetime.fromisoformat(session.expires_at) <= datetime.now(timezone.utc):
         _SESSIONS.pop(token, None)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+    return session
+
+
+def require_member(authorization: str | None = Header(default=None)) -> SessionContext:
+    session = require_session(authorization)
+    if session.role != "member":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Member role required")
     return session
 
 

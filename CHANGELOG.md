@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8 - 2026-07-13
+
+- Added live role verification before rendering member or admin dashboard UI.
+- Added member-only and admin-only verification endpoints.
+- Changed member dashboard APIs to require member role instead of accepting any valid session.
+- Ensured member tokens cannot load admin configuration views or admin-only API data.
+
 ## 0.1.7 - 2026-07-13
 
 - Reframed the public landing page from internal recommendations into included SaaS platform controls.
