@@ -1,5 +1,8 @@
 ﻿# Social Hunter
 
+Current version: `0.1.1`
+
+
 Social Hunter is an educational OSINT aggregation platform scaffold for username, email, domain, IP, and phone lookups. It is built around source attribution, confidence scoring, normalized evidence, exports, and operator auditability.
 
 This build includes the platform around lawful OSINT workflows: UI, API, source registry, connector contracts, provider clients, report exports, data models, deployment files, monitoring profile, and classroom docs.
@@ -85,3 +88,14 @@ docker compose --profile monitoring up -d
 - `docs/runbooks/operations.md`
 - `docs/cost-model.md`
 - `docs/handoff.md`
+
+## Versioning
+
+Versioning starts at `0.1.1`. Each major contribution or release milestone increments the patch version by `0.0.1`.
+
+## SaaS Routes
+
+- Public landing page: `/`
+- Member gateway: `/members/`
+- Admin gateway: `/social-hunter-admin`
+- PayPal receiving account: `techpronow@gmail.com`
